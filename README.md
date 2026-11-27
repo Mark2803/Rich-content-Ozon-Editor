@@ -38,17 +38,17 @@ nano .env
 В `.env` заполнить:
 - `SESSION_SECRET` — вывод команды `openssl rand -hex 32`;
 - `DATABASE_URL` — та же строка, что в `/home/ivanc1539/tea-market-v2/backend/.env`;
-- `AUTH_SQL` — тот же запрос проверки токена, что у воронки WB (`/home/ivanc1539/wb-salles-funnel`). В примере названия колонок угаданы, их нужно сверить.
+- `AUTH_SQL` — уже верный в примере (тот же запрос, что у воронки WB).
 
 Проверка и запуск службы:
 ```
 runuser -u ivanc1539 -- npm test
 cp deploy/rich-editor.service /etc/systemd/system/rich-editor.service
 systemctl daemon-reload && systemctl enable --now rich-editor
-sleep 2 && systemctl is-active rich-editor && curl -s http://127.0.0.1:3400/api/health
+sleep 2 && systemctl is-active rich-editor && curl -s http://127.0.0.1:3410/api/health
 ```
 
-nginx: содержимое `deploy/nginx.ssl.conf_rich-editor` вставить в блок `server` сайта (рядом с `wb-funnel`), затем `nginx -t && systemctl reload nginx`.
+nginx: `cp deploy/nginx.ssl.conf_rich-editor /home/ivanc1539/conf/web/tea-master-team.ru/`, затем `nginx -t && systemctl reload nginx`.
 
 Карточка в «Менеджменте»: в коде сайта (репозиторий TeaMarketV2) добавить карточку по образцу «Воронки продаж WB», которая ведёт на `/management/rich-editor/#t=ТОКЕН`. Токен выдаётся так же, как для воронки.
 
@@ -61,7 +61,7 @@ nginx: содержимое `deploy/nginx.ssl.conf_rich-editor` вставить
 
 ```
 npm test        # проверка перевода в JSON Ozon и обратно
-npm run dev     # http://127.0.0.1:3400/ без входа, только для проверки
+npm run dev     # http://127.0.0.1:3410/ без входа, только для проверки
 ```
 
 ## Устройство

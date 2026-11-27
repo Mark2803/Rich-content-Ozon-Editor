@@ -8,6 +8,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createHmac, createHash, timingSafeEqual, randomBytes } from 'node:crypto';
 import path from 'node:path';
+import { pgEnv } from './pg-env.js';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -22,11 +23,11 @@ if (existsSync(envFile)) {
   }
 }
 const cfg = {
-  port: Number(process.env.PORT || 3400),
+  port: Number(process.env.PORT || 3410),
   host: process.env.HOST || '127.0.0.1',
   noAuth: process.env.AUTH_DISABLED === '1',
   secret: process.env.SESSION_SECRET || '',
-  db: (process.env.DATABASE_URL || '').split('?')[0],
+  db: process.env.DATABASE_URL || '',
   authSql: process.env.AUTH_SQL || '',
   ttlMin: Number(process.env.SESSION_TTL_MIN || 60),
   cookiePath: process.env.COOKIE_PATH || '/',
@@ -46,6 +47,10 @@ if (!cfg.noAuth) {
   if (!cfg.db) miss.push('DATABASE_URL');
   if (!cfg.authSql.includes(":'t")) miss.push("AUTH_SQL (запрос с :'t' или :'th')");
   if (miss.length) { console.error(`Не хватает настроек в .env: ${miss.join(', ')}`); process.exit(1); }
+}
+let PG_ENV = null;
+if (!cfg.noAuth) {
+  try { PG_ENV = pgEnv(cfg.db); } catch (e) { console.error(`DATABASE_URL: ${e.message}`); process.exit(1); }
 }
 
 // --- Вход ---
@@ -75,9 +80,11 @@ function validSession(req) {
 // запрос к базе сайта через psql. В запросе :'t' — сам токен, :'th' — его SHA-256.
 function checkToken(token) {
   return new Promise((resolve) => {
-    if (!/^[A-Za-z0-9_-]{10,200}$/.test(token)) return resolve(false);
+    if (!/^[A-Za-z0-9_-]{20,200}$/.test(token)) return resolve(false);
     const th = createHash('sha256').update(token).digest('hex');
-    const p = spawn('psql', [cfg.db, '-X', '-tA', '-v', 'ON_ERROR_STOP=1', '-v', `t=${token}`, '-v', `th=${th}`], { stdio: ['pipe', 'pipe', 'pipe'] });
+    // Пароль базы — в переменных окружения psql, а не в командной строке.
+    const p = spawn('psql', ['-X', '-q', '-tA', '-v', 'ON_ERROR_STOP=1', '-v', `t=${token}`, '-v', `th=${th}`],
+      { stdio: ['pipe', 'pipe', 'pipe'], env: { PATH: process.env.PATH, ...PG_ENV } });
     let out = ''; let err = '';
     const timer = setTimeout(() => { p.kill(); resolve(false); }, 8000);
     p.stdout.on('data', (d) => { out += d; });

@@ -19,4 +19,4 @@
 
 ## Сервер
 
-Папка `/home/ivanc1539/rich-content-ozon-editor`, служба `rich-editor` (127.0.0.1:3400), nginx — `deploy/nginx.ssl.conf_rich-editor`, адрес https://tea-master-team.ru/management/rich-editor/. Подробно — README.
+Папка `/home/ivanc1539/rich-content-ozon-editor`, служба `rich-editor` (127.0.0.1:3410), nginx — `deploy/nginx.ssl.conf_rich-editor`, адрес https://tea-master-team.ru/management/rich-editor/. Подробно — README.

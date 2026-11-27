@@ -69,3 +69,10 @@ test('проверка находит типичные ошибки', () => {
   assert.ok(p.some((x) => x.includes('.jpg')));
   assert.deepEqual(check(PRESETS.shu.blocks()).filter((x) => !x.startsWith('Без SKU')), []);
 });
+
+test('пароль базы уходит в переменные окружения psql, а не в командную строку', async () => {
+  const { pgEnv } = await import('../pg-env.js');
+  const env = pgEnv('"postgresql://tea:p%40ss%7Cw@127.0.0.1:5432/teamarket?schema=public"');
+  assert.deepEqual(env, { PGHOST: '127.0.0.1', PGPORT: '5432', PGUSER: 'tea', PGPASSWORD: 'p@ss|w', PGDATABASE: 'teamarket' });
+  assert.throws(() => pgEnv('mysql://a@b/c'));
+});
