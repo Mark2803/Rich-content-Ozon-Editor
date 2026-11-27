@@ -1,7 +1,7 @@
 // Редактор rich-контента Ozon: интерфейс.
 // Один набор блоков рисуется и для ПК, и для телефона, поэтому правка в одном виде
 // сразу видна в другом. Картинка для телефона подставляется из ПК, если своей нет.
-import { TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
+import { DEFAULT_SIZE, TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
 import { EMOJI, SYMBOLS } from './emoji.js';
 import { PRESETS } from './presets.js';
 
@@ -142,8 +142,16 @@ const fld = (path, label, val, opts = {}) => {
 
 function imgFields(type, base, img) {
   const r = resolveImage(type, img);
-  const pcNote = img.src ? `${r.w}×${r.h}` : (img.srcM ? `берётся из телефона, ${r.w}×${r.h}` : `нужно ${r.w}×${r.h}`);
-  const mNote = img.srcM ? `своя, ${r.wM}×${r.hM}` : (img.src ? `подставлена из ПК, ${r.wM}×${r.hM}` : `нужно ${r.wM}×${r.hM}`);
+  // Размер из шаблона — только подсказка. Картинка другого размера растягивается Ozon по ширине блока
+  // с сохранением своих пропорций, без рамок; в JSON уходит её настоящий размер.
+  const def = DEFAULT_SIZE[type] || DEFAULT_SIZE.tiles;
+  const own = (src, w, h, rec) => {
+    if (!w || !h) return 'размер ещё не определился — проверьте, что ссылка открывается';
+    const small = w < rec[0] * 0.75 ? ` · меньше рекомендуемых ${rec[0]} px по ширине, может выглядеть мыльно` : '';
+    return `${w}×${h}${small}`;
+  };
+  const pcNote = img.src ? own(img.src, img.w, img.h, def.pc) : (img.srcM ? `берётся из телефона, ${r.w}×${r.h}` : `рекомендуется ${r.w}×${r.h}, подойдёт и другой размер`);
+  const mNote = img.srcM ? `своя, ${own(img.srcM, img.wM, img.hM, def.m)}` : (img.src ? `подставлена из ПК, ${r.wM}×${r.hM}` : `рекомендуется ${r.wM}×${r.hM}, подойдёт и другой размер`);
   return `${fld(`${base}.src`, 'Картинка для ПК — ссылка .jpg или .png', img.src, { ph: 'https://…/картинка.jpg' })}
     <div class="size ${!img.src && img.srcM ? 'sync' : ''}">${esc(pcNote)}</div>
     ${fld(`${base}.srcM`, 'Картинка для телефона — если пусто, как для ПК', img.srcM, { ph: 'необязательно' })}
