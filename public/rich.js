@@ -75,7 +75,7 @@ export function newBlock(type) {
     case 'faq': return { id: uid(), type, items: [{ q: 'Вопрос', a: 'Ответ.' }] };
     case 'numlist': return { id: uid(), type, items: [{ q: 'Шаг', a: 'Описание шага.' }, { q: 'Шаг', a: 'Описание шага.' }] };
     case 'table': return { id: uid(), type, title: 'Сколько чашек в упаковке', head: ['Фасовка', 'Кусочков', 'Чашек'], rows: [['8 г', '15', '15'], ['25 г', '50', '50']] };
-    case 'video': return { id: uid(), type, mode: 'youtube', youtube: '', src: '', w: 1280, h: 720 };
+    case 'video': return { id: uid(), type, src: '', w: 1280, h: 720 };
     case 'catalog': return { id: uid(), type, items: [{ title: 'Название чая', sku: '', text: 'Одна строка о вкусе.', img: img() }] };
     default: throw new Error(`Неизвестный тип блока: ${type}`);
   }
@@ -192,8 +192,7 @@ export function toOzon(blocks) {
         body: b.rows.map((r) => b.head.map((_, i) => [r[i] ?? ''])),
       } });
     } else if (b.type === 'video') {
-      if (b.mode === 'youtube') content.push({ widgetName: 'raVideo', type: 'youtube', id: youtubeId(b.youtube) });
-      else content.push({ widgetName: 'raVideo', type: 'embedded', width: Number(b.w) || 1280, height: Number(b.h) || 720,
+      content.push({ widgetName: 'raVideo', type: 'embedded', width: Number(b.w) || 1280, height: Number(b.h) || 720,
         sources: [{ type: videoMime(b.src), src: b.src }] });
     }
   }
@@ -201,13 +200,6 @@ export function toOzon(blocks) {
 }
 
 export const isOzonUrl = (u) => /^https:\/\/(www\.)?ozon\.ru\//.test(String(u || ''));
-export const questionsUrl = (sku) => (productUrl(sku) ? `${productUrl(sku)}questions/` : '');
-// Ссылку YouTube любого вида превращаем в идентификатор ролика.
-export function youtubeId(v) {
-  const s = String(v || '').trim();
-  const m = s.match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([A-Za-z0-9_-]{11})/);
-  return m ? m[1] : s;
-}
 const MIME = { mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', ogg: 'video/ogg', mpeg: 'video/mpeg', '3gp': 'video/3gpp' };
 export const videoMime = (src) => MIME[(String(src).split('?')[0].split('.').pop() || '').toLowerCase()] || 'video/mp4';
 
@@ -271,9 +263,8 @@ export function fromOzon(json) {
       const head = (w.table.head || []).map((h) => (Array.isArray(h.text) ? h.text.map((x) => (typeof x === 'string' ? x : x.content || '')).join('') : ''));
       out.push({ id: uid(), type: 'table', title: readText(w.title), head, rows: (w.table.body || []).map((r) => r.map(cell)), style: { title: fmtOf(w.title) } });
     } else if (w.widgetName === 'raVideo') {
-      out.push(w.type === 'youtube'
-        ? { id: uid(), type: 'video', mode: 'youtube', youtube: w.id || '', src: '', w: 1280, h: 720 }
-        : { id: uid(), type: 'video', mode: 'file', youtube: '', src: ((w.sources || [])[0] || {}).src || '', w: w.width || 1280, h: w.height || 720 });
+      // Ролики YouTube не переносим: в России они у покупателей не грузятся (решение Марка 27.11.2026).
+      out.push({ id: uid(), type: 'video', src: w.type === 'youtube' ? '' : ((w.sources || [])[0] || {}).src || '', w: w.width || 1280, h: w.height || 720 });
     } else {
       skipped.push(w.widgetName + (w.type ? `:${w.type}` : ''));
     }
@@ -301,8 +292,7 @@ export function check(blocks) {
     if (b.type === 'roll') b.items.forEach((it, i) => { if (it.link && !isOzonUrl(it.link)) problems.push(`${where}, картинка ${i + 1}: ссылка ведёт не на ozon.ru, Ozon такие запрещает`); });
     if (b.type === 'text' && (b.linkLabel || b.linkUrl) && !(b.linkLabel && isOzonUrl(b.linkUrl))) problems.push(`${where}: у кнопки-ссылки нужны и подпись, и адрес на ozon.ru`);
     if (b.type === 'table' && (!b.head.length || !b.rows.length)) problems.push(`${where}: в таблице нужны столбцы и хотя бы одна строка`);
-    if (b.type === 'video' && b.mode === 'youtube' && !/^[A-Za-z0-9_-]{11}$/.test(youtubeId(b.youtube))) problems.push(`${where}: вставьте ссылку на ролик YouTube`);
-    if (b.type === 'video' && b.mode === 'file' && !/^https:\/\/\S+\.(mp4|webm|mov|ogg|mpeg|3gp)(\?\S*)?$/i.test(b.src || '')) problems.push(`${where}: нужна прямая ссылка на видеофайл .mp4`);
+    if (b.type === 'video' && !/^https:\/\/\S+\.(mp4|webm|mov|ogg|mpeg|3gp)(\?\S*)?$/i.test(b.src || '')) problems.push(`${where}: нужна прямая ссылка на видеофайл .mp4`);
   });
   const empty = imgs.filter(([, u]) => !u);
   const bad = imgs.filter(([, u]) => u && !IMG_RE.test(u));

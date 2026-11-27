@@ -1,7 +1,7 @@
 // Редактор rich-контента Ozon: интерфейс.
 // Один набор блоков рисуется и для ПК, и для телефона, поэтому правка в одном виде
 // сразу видна в другом. Картинка для телефона подставляется из ПК, если своей нет.
-import { TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, questionsUrl, youtubeId, DEFAULT_STYLE } from './rich.js';
+import { TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
 import { EMOJI, SYMBOLS } from './emoji.js';
 import { PRESETS } from './presets.js';
 
@@ -125,7 +125,7 @@ function renderPreview() {
     if (b.type === 'numlist') inner = `<ol class="numl">${b.items.map((it, i) => `<li>${ed(b, `items.${i}.q`, it.q, 's4')}${ed(b, `items.${i}.a`, it.a, 's3')}</li>`).join('')}</ol>`;
     if (b.type === 'table') { const st = getStyle(b, 'text'); const cs = `font-size:${SIZES[st.size]}px;color:${COLORS[st.color].hex};text-align:${st.align}`;
       inner = `<div class="tbl">${ed(b, 'title', b.title, 's4')}<div class="tblw"><table><thead><tr>${b.head.map((h) => `<th style="${cs}">${esc(h)}</th>`).join('')}</tr></thead><tbody>${b.rows.map((r) => `<tr>${b.head.map((_, i) => `<td style="${cs}">${esc(r[i] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`; }
-    if (b.type === 'video') inner = `<div class="vid"><span>▶</span><small>${b.mode === 'youtube' ? `YouTube ${esc(youtubeId(b.youtube) || '— вставьте ссылку')}` : esc(b.src || 'Видеофайл .mp4 — вставьте ссылку')}</small></div>`;
+    if (b.type === 'video') inner = `<div class="vid"><span>▶</span><small>${esc(b.src || 'Видеофайл .mp4 — вставьте ссылку')}</small></div>`;
     if (b.type === 'catalog') inner = b.items.map((it, i) => `<div class="cat"><div>${imgHtml('catalog', it.img, it.title)}</div><div>${ed(b, `items.${i}.title`, it.title, `s4 ${productUrl(it.sku) ? 'lnk' : ''}`)}${ed(b, `items.${i}.text`, it.text, 's3')}</div></div>`).join('');
     return `<div class="w ${b.id === sel ? 'on' : ''}" data-id="${b.id}"><span class="tag">${esc(TYPES[b.type])}</span>${inner}</div>`;
   }).join('');
@@ -177,20 +177,17 @@ function tableEditor(b) {
 }
 
 function videoEditor(b) {
-  return `<div class="seg" role="group" aria-label="Источник видео" style="margin-top:8px">
-      <button type="button" data-act="vmode" data-v="youtube" aria-pressed="${b.mode === 'youtube'}">YouTube</button>
-      <button type="button" data-act="vmode" data-v="file" aria-pressed="${b.mode === 'file'}">Файл .mp4</button></div>
-    ${b.mode === 'youtube' ? fld('youtube', 'Ссылка на ролик YouTube', b.youtube, { ph: 'https://youtu.be/…' })
-      : fld('src', 'Прямая ссылка на видео .mp4', b.src, { ph: 'https://…/video.mp4' }) + `<div class="row2">${fld('w', 'Ширина', b.w, { mode: 'numeric' })}${fld('h', 'Высота', b.h, { mode: 'numeric' })}</div>`}
-    <p class="note">Ozon проверяет видео при модерации карточки.</p>`;
+  return fld('src', 'Прямая ссылка на видео .mp4', b.src, { ph: 'https://…/video.mp4' })
+    + `<div class="row2">${fld('w', 'Ширина', b.w, { mode: 'numeric' })}${fld('h', 'Высота', b.h, { mode: 'numeric' })}</div>
+    <p class="note">Только видеофайл. Ролики YouTube у покупателей в России не грузятся. Ozon проверяет видео при модерации.</p>`;
 }
 
 function linkEditor(b) {
   return `<div class="grp"><div class="gh"><b>Кнопка-ссылка под текстом</b></div>
     ${fld('linkLabel', 'Подпись', b.linkLabel, { ph: 'Задать вопрос продавцу →' })}
     ${fld('linkUrl', 'Адрес на ozon.ru', b.linkUrl, { ph: 'https://www.ozon.ru/…' })}
-    <div class="blk-acts"><button type="button" class="sm ghost" data-act="lnkq">Вопросы о товаре по SKU</button><button type="button" class="sm ghost" data-act="lnkshop">Страница магазина</button><button type="button" class="sm ghost" data-act="lnkclear">Убрать</button></div>
-    <p class="note">Чат с продавцом Ozon открывается только своей кнопкой в карточке. Отсюда можно вести на вопросы о товаре или на страницу магазина.</p></div>`;
+    <div class="blk-acts"><button type="button" class="sm ghost" data-act="lnkshop">Страница магазина</button><button type="button" class="sm ghost" data-act="lnkclear">Убрать</button></div>
+    <p class="note">Только ссылки на ozon.ru: страница магазина, другой товар, подборка. «Написать продавцу» — родная кнопка Ozon в карточке, отдельной ссылки на чат нет.</p></div>`;
 }
 
 function itemFields(b, it, i) {
@@ -320,12 +317,6 @@ function onAction(e) {
     case 'trowdel': b.rows.splice(i, 1); break;
     case 'tcoladd': b.head.push('Столбец'); b.rows.forEach((r) => r.push('')); break;
     case 'tcoldel': b.head.splice(i, 1); b.rows.forEach((r) => r.splice(i, 1)); break;
-    case 'vmode': b.mode = btn.dataset.v; break;
-    case 'lnkq': {
-      const sku = (prompt('SKU товара на Ozon (только цифры):', '') || '').trim();
-      if (!questionsUrl(sku)) { toast('Нужен SKU — только цифры'); return; }
-      b.linkUrl = questionsUrl(sku); if (!b.linkLabel) b.linkLabel = 'Задать вопрос продавцу →'; break;
-    }
     case 'lnkshop': {
       const u = (prompt('Вставьте ссылку на страницу магазина на Ozon (откройте магазин в Ozon и скопируйте адрес):', '') || '').trim();
       if (!/^https:\/\/(www\.)?ozon\.ru\//.test(u)) { toast('Нужна ссылка, которая начинается с https://www.ozon.ru/'); return; }

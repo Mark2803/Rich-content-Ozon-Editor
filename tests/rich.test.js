@@ -100,7 +100,6 @@ test('эмодзи и символы проходят в текст как ес�
 });
 
 test('новые блоки: нумерованный список, таблица, видео, кнопка-ссылка', async () => {
-  const { questionsUrl, youtubeId } = await import('../public/rich.js');
   const num = newBlock('numlist');
   assert.equal(toOzon([num]).content[0].theme, 'number');
   const table = newBlock('table');
@@ -108,13 +107,13 @@ test('новые блоки: нумерованный список, таблиц
   assert.equal(t.widgetName, 'raTable');
   assert.deepEqual(t.table.head.map((h) => h.text[0]), ['Фасовка', 'Кусочков', 'Чашек']);
   assert.deepEqual(t.table.body[0], [['8 г'], ['15'], ['15']]);
-  const v = newBlock('video'); v.youtube = 'https://youtu.be/dQw4w9WgXcQ?t=3';
-  assert.deepEqual(toOzon([v]).content[0], { widgetName: 'raVideo', type: 'youtube', id: 'dQw4w9WgXcQ' });
-  assert.equal(youtubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+  const v = newBlock('video'); v.src = 'https://cdn.example.ru/tea.mp4';
+  assert.deepEqual(toOzon([v]).content[0], { widgetName: 'raVideo', type: 'embedded', width: 1280, height: 720, sources: [{ type: 'video/mp4', src: 'https://cdn.example.ru/tea.mp4' }] });
+  assert.ok(check([newBlock('video')]).some((p) => p.includes('.mp4')), 'пустое видео — ошибка');
   const btn = newBlock('text');
-  btn.linkLabel = 'Задать вопрос продавцу →'; btn.linkUrl = questionsUrl('5211050462');
+  btn.linkLabel = 'Все чаи магазина →'; btn.linkUrl = 'https://www.ozon.ru/product/5211050462/';
   const tb = toOzon([btn]).content[0];
-  assert.deepEqual(tb.text.items.at(-1), { type: 'link', content: 'Задать вопрос продавцу →', href: 'https://www.ozon.ru/product/5211050462/questions/' });
+  assert.deepEqual(tb.text.items.at(-1), { type: 'link', content: 'Все чаи магазина →', href: 'https://www.ozon.ru/product/5211050462/' });
   btn.linkUrl = 'https://t.me/shop';
   assert.ok(check([btn]).some((p) => p.includes('ozon.ru')));
   assert.equal(toOzon([btn]).content[0].text.items.some((i) => i.type === 'link'), false, 'чужая ссылка не уходит в JSON');
