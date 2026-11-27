@@ -50,14 +50,16 @@ test('импорт формата со строками в content (как у ч
   const json = { version: 0.3, content: [
     { widgetName: 'raShowcase', type: 'chess', blocks: [{ img: { src: 'https://a.ru/1.jpg', srcMobile: 'https://a.ru/1.jpg', widthMobile: 1067, heightMobile: 800, position: 'fill', positionMobile: 'fill' }, imgLink: '', reverse: false, title: { content: ['Смола Ча Гао ', '(Шу Пуэр)'] }, text: { content: ['Текст'] } }] },
     { widgetName: 'raShowcase', type: 'chess', blocks: [{ img: { src: 'https://a.ru/2.jpg', srcMobile: 'https://a.ru/2m.jpg', widthMobile: 640, heightMobile: 640 }, title: { content: ['Второй'] }, text: { content: [] } }] },
-    { widgetName: 'raVideo', blocks: [] },
+    { widgetName: 'raVideo', type: 'youtube', id: 'dQw4w9WgXcQ' },
+    { widgetName: 'raCarousel', blocks: [] },
   ] };
   const { blocks, skipped } = fromOzon(json);
-  assert.equal(blocks.length, 1, 'подряд идущие шахматки склеены');
+  assert.equal(blocks.length, 2, 'подряд идущие шахматки склеены, видео — отдельный блок');
+  assert.equal(blocks[1].type, 'video');
   assert.equal(blocks[0].items.length, 2);
   assert.equal(blocks[0].items[0].title, 'Смола Ча Гао \n(Шу Пуэр)');
   assert.equal(blocks[0].items[1].img.srcM, 'https://a.ru/2m.jpg');
-  assert.deepEqual(skipped, ['raVideo']);
+  assert.deepEqual(skipped, ['raCarousel']);
 });
 
 test('проверка находит типичные ошибки', () => {
@@ -75,4 +77,49 @@ test('пароль базы уходит в переменные окружен�
   const env = pgEnv('"postgresql://tea:p%40ss%7Cw@127.0.0.1:5432/teamarket?schema=public"');
   assert.deepEqual(env, { PGHOST: '127.0.0.1', PGPORT: '5432', PGUSER: 'tea', PGPASSWORD: 'p@ss|w', PGDATABASE: 'teamarket' });
   assert.throws(() => pgEnv('mysql://a@b/c'));
+});
+
+test('стиль текста: размер, цвет и выравнивание уходят в JSON и возвращаются при импорте', async () => {
+  const { SIZES, COLORS } = await import('../public/rich.js');
+  assert.equal(Object.keys(SIZES).length, 7);
+  assert.equal(Object.keys(COLORS).length, 4);
+  const b = newBlock('chess');
+  b.style = { title: { size: 'size6', color: 'color2', align: 'center' } };
+  const w = toOzon([b]).content[0];
+  assert.deepEqual([w.blocks[0].title.size, w.blocks[0].title.color, w.blocks[0].title.align], ['size6', 'color2', 'center']);
+  assert.equal(w.blocks[0].text.size, 'size3', 'не заданное берётся по умолчанию');
+  const back = fromOzon(toOzon([b])).blocks[0];
+  assert.equal(back.style.title.size, 'size6');
+  assert.equal(back.style.title.color, 'color2');
+});
+
+test('эмодзи и символы проходят в текст как есть', () => {
+  const b = newBlock('text');
+  b.title = '🍵 Смола шу пуэра ✓';
+  assert.equal(toOzon([b]).content[0].title.items[0].content, '🍵 Смола шу пуэра ✓');
+});
+
+test('новые блоки: нумерованный список, таблица, видео, кнопка-ссылка', async () => {
+  const { questionsUrl, youtubeId } = await import('../public/rich.js');
+  const num = newBlock('numlist');
+  assert.equal(toOzon([num]).content[0].theme, 'number');
+  const table = newBlock('table');
+  const t = toOzon([table]).content[0];
+  assert.equal(t.widgetName, 'raTable');
+  assert.deepEqual(t.table.head.map((h) => h.text[0]), ['Фасовка', 'Кусочков', 'Чашек']);
+  assert.deepEqual(t.table.body[0], [['8 г'], ['15'], ['15']]);
+  const v = newBlock('video'); v.youtube = 'https://youtu.be/dQw4w9WgXcQ?t=3';
+  assert.deepEqual(toOzon([v]).content[0], { widgetName: 'raVideo', type: 'youtube', id: 'dQw4w9WgXcQ' });
+  assert.equal(youtubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+  const btn = newBlock('text');
+  btn.linkLabel = 'Задать вопрос продавцу →'; btn.linkUrl = questionsUrl('5211050462');
+  const tb = toOzon([btn]).content[0];
+  assert.deepEqual(tb.text.items.at(-1), { type: 'link', content: 'Задать вопрос продавцу →', href: 'https://www.ozon.ru/product/5211050462/questions/' });
+  btn.linkUrl = 'https://t.me/shop';
+  assert.ok(check([btn]).some((p) => p.includes('ozon.ru')));
+  assert.equal(toOzon([btn]).content[0].text.items.some((i) => i.type === 'link'), false, 'чужая ссылка не уходит в JSON');
+  // импорт обратно
+  const back = fromOzon(toOzon([num, table, v])).blocks;
+  assert.deepEqual(back.map((b) => b.type), ['numlist', 'table', 'video']);
+  assert.deepEqual(back[1].rows[1], ['25 г', '50', '50']);
 });

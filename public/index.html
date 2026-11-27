@@ -30,6 +30,7 @@
       <button id="v-pc" aria-pressed="true">Компьютер</button>
       <button id="v-m" aria-pressed="false">Телефон</button>
     </div>
+    <button id="emoji" class="ghost" title="Эмодзи и символы — вставляются туда, где курсор">😊 Эмодзи</button>
     <button id="undo" class="ghost" title="Отменить (Ctrl+Z)">Отменить</button>
     <button id="import" class="ghost">Импорт JSON</button>
     <button id="save" class="ghost">Сохранить</button>
@@ -71,6 +72,11 @@
     </div>
   </form>
 </dialog>
+<div id="emo" class="emo-pop" hidden role="dialog" aria-label="Эмодзи и символы">
+  <div class="emo-head"><div class="seg"><button type="button" id="emo-t-e" aria-pressed="true">Эмодзи</button><button type="button" id="emo-t-s" aria-pressed="false">Символы</button></div><button type="button" class="icon ghost" id="emo-x" aria-label="Закрыть">×</button></div>
+  <p class="note">Поставьте курсор в текст блока и нажмите значок.</p>
+  <div id="emo-body"></div>
+</div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script type="module" src="app.js"></script>
 </body>

@@ -1,7 +1,8 @@
 // Редактор rich-контента Ozon: интерфейс.
 // Один набор блоков рисуется и для ПК, и для телефона, поэтому правка в одном виде
 // сразу видна в другом. Картинка для телефона подставляется из ПК, если своей нет.
-import { TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl } from './rich.js';
+import { TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, questionsUrl, youtubeId, DEFAULT_STYLE } from './rich.js';
+import { EMOJI, SYMBOLS } from './emoji.js';
 import { PRESETS } from './presets.js';
 
 const $ = (id) => document.getElementById(id);
@@ -102,7 +103,12 @@ function imgHtml(type, img, label) {
 }
 
 // Редактируемый текст прямо в предпросмотре.
-const ed = (b, path, val, cls) => `<div class="${cls}" contenteditable="plaintext-only" data-b="${b.id}" data-f="${path}" spellcheck="true">${esc(val)}</div>`;
+const ed = (b, path, val, cls) => {
+  const which = /(^|\.)(title|q)$/.test(path) ? 'title' : 'text';
+  const st = getStyle(b, which);
+  const css = `font-size:${SIZES[st.size]}px;line-height:1.3;color:${COLORS[st.color].hex};text-align:${st.align}`;
+  return `<div class="${cls} ${which === 'title' ? 'ttl' : 'txt'}" style="${css}" contenteditable="plaintext-only" data-b="${b.id}" data-f="${path}" spellcheck="true">${esc(val)}</div>`;
+};
 
 function renderPreview() {
   const pv = $('pv');
@@ -114,8 +120,12 @@ function renderPreview() {
     if (b.type === 'chess') inner = b.items.map((it, i) => `<div class="chess ${i % 2 ? 'rev' : ''}"><div class="im">${imgHtml('chess', it.img, it.title)}</div><div class="tx">${ed(b, `items.${i}.title`, it.title, 's4')}${ed(b, `items.${i}.text`, it.text, 's3')}</div></div>`).join('');
     if (b.type === 'tiles') inner = `<div class="tiles" style="--n:${Math.min(3, b.items.length) || 1}">${b.items.map((it, i) => `<div>${imgHtml('tiles', it.img, it.title)}${ed(b, `items.${i}.title`, it.title, 's4 c')}${ed(b, `items.${i}.text`, it.text, 's3 c')}</div>`).join('')}</div>`;
     if (b.type === 'roll') inner = b.items.map((it) => imgHtml('roll', it.img, it.alt || 'Картинка во всю ширину')).join('');
-    if (b.type === 'text') inner = `<div class="tb ${esc(b.theme)} c">${ed(b, 'title', b.title, 's5')}${ed(b, 'text', b.text, 's3')}</div>`;
+    if (b.type === 'text') inner = `<div class="tb" style="background:${(THEMES[b.theme] || THEMES.default).bg}">${ed(b, 'title', b.title, 's5')}${ed(b, 'text', b.text, 's3')}${b.linkLabel ? `<div class="lnkbtn" style="text-align:${getStyle(b, 'text').align}"><span>${esc(b.linkLabel)}</span></div>` : ''}</div>`;
     if (b.type === 'faq') inner = b.items.map((it, i) => `<div class="faq">${ed(b, `items.${i}.q`, it.q, 's4')}${ed(b, `items.${i}.a`, it.a, 's3')}</div>`).join('');
+    if (b.type === 'numlist') inner = `<ol class="numl">${b.items.map((it, i) => `<li>${ed(b, `items.${i}.q`, it.q, 's4')}${ed(b, `items.${i}.a`, it.a, 's3')}</li>`).join('')}</ol>`;
+    if (b.type === 'table') { const st = getStyle(b, 'text'); const cs = `font-size:${SIZES[st.size]}px;color:${COLORS[st.color].hex};text-align:${st.align}`;
+      inner = `<div class="tbl">${ed(b, 'title', b.title, 's4')}<div class="tblw"><table><thead><tr>${b.head.map((h) => `<th style="${cs}">${esc(h)}</th>`).join('')}</tr></thead><tbody>${b.rows.map((r) => `<tr>${b.head.map((_, i) => `<td style="${cs}">${esc(r[i] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`; }
+    if (b.type === 'video') inner = `<div class="vid"><span>▶</span><small>${b.mode === 'youtube' ? `YouTube ${esc(youtubeId(b.youtube) || '— вставьте ссылку')}` : esc(b.src || 'Видеофайл .mp4 — вставьте ссылку')}</small></div>`;
     if (b.type === 'catalog') inner = b.items.map((it, i) => `<div class="cat"><div>${imgHtml('catalog', it.img, it.title)}</div><div>${ed(b, `items.${i}.title`, it.title, `s4 ${productUrl(it.sku) ? 'lnk' : ''}`)}${ed(b, `items.${i}.text`, it.text, 's3')}</div></div>`).join('');
     return `<div class="w ${b.id === sel ? 'on' : ''}" data-id="${b.id}"><span class="tag">${esc(TYPES[b.type])}</span>${inner}</div>`;
   }).join('');
@@ -140,7 +150,48 @@ function imgFields(type, base, img) {
     <div class="size ${img.src && !img.srcM ? 'sync' : ''}">${esc(mNote)}</div>`;
 }
 
-const ITEM_NAMES = { chess: 'Блок', tiles: 'Плитка', roll: 'Картинка', faq: 'Вопрос', catalog: 'Чай' };
+const ITEM_NAMES = { chess: 'Блок', tiles: 'Плитка', roll: 'Картинка', faq: 'Вопрос', numlist: 'Пункт', catalog: 'Чай' };
+
+// Оформление текста: только то, что разрешает Ozon — размер, цвет, выравнивание.
+function styleControls(b) {
+  if (['roll', 'video'].includes(b.type)) return '';
+  const part = (which, label) => {
+    const st = getStyle(b, which);
+    const def = DEFAULT_STYLE[b.type][which];
+    return `<div class="stl"><b>${label}</b>
+      <div class="stl-row"><select data-style="${which}.size" aria-label="${label}: размер">${Object.entries(SIZES).map(([k, px]) => `<option value="${k}" ${st.size === k ? 'selected' : ''}>${px} px${def.size === k ? ' · обычный' : ''}</option>`).join('')}</select>
+      <span class="seg sm-seg" role="group" aria-label="${label}: выравнивание">${[['left', '⟸'], ['center', '≡'], ['right', '⟹']].map(([v, t]) => `<button type="button" class="${st.align === v ? 'on' : ''}" data-style="${which}.align" data-v="${v}" title="${{ left: 'По левому краю', center: 'По центру', right: 'По правому краю' }[v]}">${t}</button>`).join('')}</span></div>
+      <div class="sw" role="group" aria-label="${label}: цвет">${Object.entries(COLORS).map(([k, c]) => `<button type="button" class="${st.color === k ? 'on' : ''}" data-style="${which}.color" data-v="${k}" title="${c.name}" style="background:${c.hex}"></button>`).join('')}<span>${COLORS[st.color].name}</span></div></div>`;
+  };
+  return `<div class="grp style-grp"><div class="gh"><b>Оформление текста</b><button type="button" class="sm ghost" data-act="sreset">Как было</button></div>
+    ${part('title', b.type === 'table' ? 'Заголовок таблицы' : 'Заголовки')}${part('text', b.type === 'table' ? 'Ячейки' : 'Текст')}
+    <p class="note">Шрифт в карточке всегда фирменный шрифт Ozon — его поменять нельзя. Жирного и курсива в rich-контенте нет.</p></div>`;
+}
+
+function tableEditor(b) {
+  const head = b.head.map((h, i) => `<div class="cell"><input data-f="head.${i}" value="${esc(h)}" aria-label="Столбец ${i + 1}"><button type="button" class="icon ghost danger" data-act="tcoldel" data-i="${i}" aria-label="Удалить столбец" ${b.head.length < 2 ? 'disabled' : ''}>×</button></div>`).join('');
+  const rows = b.rows.map((r, ri) => `<div class="trow">${b.head.map((_, ci) => `<input data-f="rows.${ri}.${ci}" value="${esc(r[ci] ?? '')}" aria-label="Строка ${ri + 1}, столбец ${ci + 1}">`).join('')}<button type="button" class="icon ghost danger" data-act="trowdel" data-i="${ri}" aria-label="Удалить строку">×</button></div>`).join('');
+  return `${fld('title', 'Заголовок таблицы', b.title)}<label>Столбцы</label><div class="thead">${head}</div>
+    <label>Строки</label><div class="tbody" style="--cols:${b.head.length}">${rows}</div>
+    <div class="blk-acts"><button type="button" class="sm ghost" data-act="trowadd">Добавить строку</button><button type="button" class="sm ghost" data-act="tcoladd">Добавить столбец</button></div>`;
+}
+
+function videoEditor(b) {
+  return `<div class="seg" role="group" aria-label="Источник видео" style="margin-top:8px">
+      <button type="button" data-act="vmode" data-v="youtube" aria-pressed="${b.mode === 'youtube'}">YouTube</button>
+      <button type="button" data-act="vmode" data-v="file" aria-pressed="${b.mode === 'file'}">Файл .mp4</button></div>
+    ${b.mode === 'youtube' ? fld('youtube', 'Ссылка на ролик YouTube', b.youtube, { ph: 'https://youtu.be/…' })
+      : fld('src', 'Прямая ссылка на видео .mp4', b.src, { ph: 'https://…/video.mp4' }) + `<div class="row2">${fld('w', 'Ширина', b.w, { mode: 'numeric' })}${fld('h', 'Высота', b.h, { mode: 'numeric' })}</div>`}
+    <p class="note">Ozon проверяет видео при модерации карточки.</p>`;
+}
+
+function linkEditor(b) {
+  return `<div class="grp"><div class="gh"><b>Кнопка-ссылка под текстом</b></div>
+    ${fld('linkLabel', 'Подпись', b.linkLabel, { ph: 'Задать вопрос продавцу →' })}
+    ${fld('linkUrl', 'Адрес на ozon.ru', b.linkUrl, { ph: 'https://www.ozon.ru/…' })}
+    <div class="blk-acts"><button type="button" class="sm ghost" data-act="lnkq">Вопросы о товаре по SKU</button><button type="button" class="sm ghost" data-act="lnkshop">Страница магазина</button><button type="button" class="sm ghost" data-act="lnkclear">Убрать</button></div>
+    <p class="note">Чат с продавцом Ozon открывается только своей кнопкой в карточке. Отсюда можно вести на вопросы о товаре или на страницу магазина.</p></div>`;
+}
 
 function itemFields(b, it, i) {
   const p = `items.${i}`;
@@ -148,6 +199,7 @@ function itemFields(b, it, i) {
   if (b.type === 'tiles') return fld(`${p}.title`, 'Название', it.title) + fld(`${p}.text`, 'Подпись', it.text) + fld(`${p}.sku`, 'SKU Ozon — куда ведёт плитка', it.sku, { mode: 'numeric' }) + imgFields('tiles', `${p}.img`, it.img);
   if (b.type === 'roll') return fld(`${p}.sku`, 'SKU Ozon — куда ведёт картинка', it.sku, { mode: 'numeric' }) + fld(`${p}.link`, 'Или ссылка на страницу Ozon', it.link, { ph: 'https://www.ozon.ru/…' }) + fld(`${p}.alt`, 'Описание картинки', it.alt) + imgFields('roll', `${p}.img`, it.img);
   if (b.type === 'faq') return fld(`${p}.q`, 'Вопрос', it.q) + fld(`${p}.a`, 'Ответ', it.a, { area: 1 });
+  if (b.type === 'numlist') return fld(`${p}.q`, 'Заголовок пункта', it.q) + fld(`${p}.a`, 'Текст', it.a, { area: 1 });
   if (b.type === 'catalog') return fld(`${p}.title`, 'Название', it.title) + fld(`${p}.sku`, 'SKU Ozon', it.sku, { mode: 'numeric' }) + fld(`${p}.text`, 'Описание', it.text, { area: 1 }) + imgFields('catalog', `${p}.img`, it.img);
   return '';
 }
@@ -160,7 +212,9 @@ function renderInspector() {
   let html = '';
   if (b.type === 'hero') html = fld('title', 'Заголовок', b.title) + fld('text', 'Текст', b.text, { area: 1 }) + imgFields('hero', 'img', b.img);
   if (b.type === 'text') html = fld('title', 'Заголовок', b.title) + fld('text', 'Текст', b.text, { area: 1 })
-    + `<label for="f-theme">Фон</label><select id="f-theme" data-f="theme">${[['primary', 'Серый'], ['secondary', 'Голубой'], ['tertiary', 'Тёплый'], ['default', 'Без фона']].map(([v, t]) => `<option value="${v}" ${b.theme === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+    + `<label for="f-theme">Фон</label><select id="f-theme" data-f="theme">${Object.entries(THEMES).map(([v, t]) => `<option value="${v}" ${b.theme === v ? 'selected' : ''}>${t.name}</option>`).join('')}</select>` + linkEditor(b);
+  if (b.type === 'table') html = tableEditor(b);
+  if (b.type === 'video') html = videoEditor(b);
   if (b.items) {
     html += b.items.map((it, i) => `<div class="grp"><div class="gh"><b>${ITEM_NAMES[b.type]} ${i + 1}</b><span>
       <button class="icon ghost" data-act="iup" data-i="${i}" ${i ? '' : 'disabled'} aria-label="Выше">↑</button>
@@ -168,6 +222,7 @@ function renderInspector() {
       <button class="icon ghost danger" data-act="idel" data-i="${i}" aria-label="Удалить">×</button></span></div>${itemFields(b, it, i)}</div>`).join('');
     html += `<button class="ghost" data-act="iadd" style="margin-top:12px">Добавить: ${ITEM_NAMES[b.type].toLowerCase()}</button>`;
   }
+  html += styleControls(b);
   html += `<div class="blk-acts">
     <button class="sm ghost" data-act="up" ${n ? '' : 'disabled'}>Блок выше</button>
     <button class="sm ghost" data-act="down" ${n < state.blocks.length - 1 ? '' : 'disabled'}>Блок ниже</button>
@@ -261,6 +316,23 @@ function onAction(e) {
     case 'idown': swap(arr, i, i + 1); break;
     case 'idel': arr.splice(i, 1); break;
     case 'iadd': arr.push(clone(newBlock(b.type).items[0])); break;
+    case 'trowadd': b.rows.push(b.head.map(() => '')); break;
+    case 'trowdel': b.rows.splice(i, 1); break;
+    case 'tcoladd': b.head.push('Столбец'); b.rows.forEach((r) => r.push('')); break;
+    case 'tcoldel': b.head.splice(i, 1); b.rows.forEach((r) => r.splice(i, 1)); break;
+    case 'vmode': b.mode = btn.dataset.v; break;
+    case 'lnkq': {
+      const sku = (prompt('SKU товара на Ozon (только цифры):', '') || '').trim();
+      if (!questionsUrl(sku)) { toast('Нужен SKU — только цифры'); return; }
+      b.linkUrl = questionsUrl(sku); if (!b.linkLabel) b.linkLabel = 'Задать вопрос продавцу →'; break;
+    }
+    case 'lnkshop': {
+      const u = (prompt('Вставьте ссылку на страницу магазина на Ozon (откройте магазин в Ozon и скопируйте адрес):', '') || '').trim();
+      if (!/^https:\/\/(www\.)?ozon\.ru\//.test(u)) { toast('Нужна ссылка, которая начинается с https://www.ozon.ru/'); return; }
+      b.linkUrl = u.split('?')[0]; if (!b.linkLabel) b.linkLabel = 'Все чаи магазина →'; break;
+    }
+    case 'lnkclear': b.linkLabel = ''; b.linkUrl = ''; break;
+    case 'sreset': delete b.style; break;
     case 'up': swap(state.blocks, n, n - 1); break;
     case 'down': swap(state.blocks, n, n + 1); break;
     case 'dup': { const c = clone(b); c.id = newBlock('text').id; state.blocks.splice(n + 1, 0, c); sel = c.id; break; }
@@ -355,6 +427,48 @@ function importJson() {
   });
 }
 
+// ---------- Эмодзи и символы ----------
+// Вставляются туда, где стоял курсор: в поле справа или в текст прямо в предпросмотре.
+let lastField = null; let lastRange = null;
+document.addEventListener('focusin', (e) => {
+  const t = e.target;
+  if (t.matches('#insp input:not([type=checkbox]), #insp textarea, #pv [contenteditable], #proj-name')) lastField = t;
+});
+document.addEventListener('selectionchange', () => {
+  const s = window.getSelection();
+  if (s.rangeCount && lastField && lastField.isContentEditable && lastField.contains(s.anchorNode)) lastRange = s.getRangeAt(0).cloneRange();
+});
+function insertSymbol(ch) {
+  const el = lastField;
+  if (!el || !document.body.contains(el)) return toast('Сначала поставьте курсор в текст блока');
+  if (el.isContentEditable) {
+    el.focus();
+    const sel2 = window.getSelection();
+    if (lastRange && el.contains(lastRange.startContainer)) { sel2.removeAllRanges(); sel2.addRange(lastRange); }
+    document.execCommand('insertText', false, ch);
+  } else {
+    const a = el.selectionStart ?? el.value.length; const z = el.selectionEnd ?? a;
+    el.value = el.value.slice(0, a) + ch + el.value.slice(z);
+    el.focus(); el.setSelectionRange(a + ch.length, a + ch.length);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+function renderPicker(tab) {
+  const groups = tab === 'sym' ? SYMBOLS : EMOJI;
+  $('emo-body').innerHTML = groups.map((g) => `<div class="emo-g"><b>${esc(g.name)}</b><div>${g.items.map((c) => `<button type="button" class="emo" data-ch="${esc(c)}" title="${esc(c)}">${esc(c)}</button>`).join('')}</div></div>`).join('');
+  $('emo-t-e').setAttribute('aria-pressed', tab !== 'sym'); $('emo-t-s').setAttribute('aria-pressed', tab === 'sym');
+}
+$('emoji').addEventListener('mousedown', (e) => e.preventDefault());
+$('emoji').onclick = () => { const p = $('emo'); p.hidden = !p.hidden; if (!p.hidden) renderPicker('emo'); };
+$('emo').addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
+$('emo').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'emo-t-e') return renderPicker('emo');
+  if (b.id === 'emo-t-s') return renderPicker('sym');
+  if (b.id === 'emo-x') { $('emo').hidden = true; return; }
+  if (b.dataset.ch) insertSymbol(b.dataset.ch);
+});
+
 let toastTimer;
 function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3200); }
 
@@ -385,6 +499,16 @@ $('pv').addEventListener('blur', () => { renderInspector(); }, true);
 $('insp').addEventListener('input', onField);
 $('insp').addEventListener('change', onField);
 $('insp').addEventListener('click', onAction);
+// Оформление текста: размер (список), цвет и выравнивание (кнопки).
+function setStyle(b, key, v) {
+  const [which, prop] = key.split('.');
+  remember(true);
+  b.style = b.style || {};
+  b.style[which] = { ...(b.style[which] || {}), [prop]: v };
+  saveDraft(); renderPreview(); renderInspector(); renderChecks();
+}
+$('insp').addEventListener('click', (e) => { const el = e.target.closest('button[data-style]'); const b = blockById(sel); if (el && b) setStyle(b, el.dataset.style, el.dataset.v); });
+$('insp').addEventListener('change', (e) => { const el = e.target.closest('select[data-style]'); const b = blockById(sel); if (el && b) setStyle(b, el.dataset.style, el.value); });
 $('proj-name').addEventListener('input', (e) => { state.name = e.target.value; saveDraft(); });
 $('open').addEventListener('change', (e) => openTemplate(e.target.value).catch((er) => er.message !== 'auth' && toast(er.message)));
 $('save').onclick = saveTemplate;

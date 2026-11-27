@@ -1,7 +1,9 @@
 // Модель rich-контента и перевод в JSON Ozon (версия 0.3) и обратно.
 // Один и тот же блок описывает и вид для ПК, и вид для телефона:
 // картинка для телефона берётся из картинки для ПК, если своей нет, и наоборот.
-// Набор полей каждого виджета скопирован с живых карточек Ozon (ноябрь 2026).
+// Набор полей сверен с официальной схемой Ozon https://st.ozone.ru/s3/artifact/schema.json
+// и с живыми карточками (ноябрь 2026). Шрифт Ozon свой (GT Eesti) и не меняется;
+// у текста есть только размер (size1–size7), цвет (color1–color4) и выравнивание.
 
 export const TYPES = {
   hero: 'Обложка',
@@ -11,7 +13,40 @@ export const TYPES = {
   text: 'Заголовок и текст',
   faq: 'Вопросы и ответы',
   catalog: 'Витрина магазина',
+  numlist: 'Нумерованный список',
+  table: 'Таблица',
+  video: 'Видео',
 };
+
+// Размеры и цвета текста Ozon — сняты в песочнице rich-content.ozon.ru 27.11.2026.
+export const SIZES = { size1: 12, size2: 14, size3: 16, size4: 20, size5: 24, size6: 30, size7: 38 };
+export const COLORS = {
+  color1: { hex: '#001a34', name: 'Основной' },
+  color2: { hex: '#3d5165', name: 'Приглушённый' },
+  color3: { hex: '#808d9a', name: 'Серый' },
+  color4: { hex: '#ffffff', name: 'Белый (на картинке)' },
+};
+export const THEMES = {
+  default: { bg: '#ffffff', name: 'Без фона' },
+  primary: { bg: '#ebf5ff', name: 'Голубой' },
+  secondary: { bg: '#ffffff', name: 'Белый' },
+  tertiary: { bg: '#eff3f6', name: 'Серый' },
+};
+
+const DS = (ts, ta, xs, xa) => ({ title: { size: ts, color: 'color1', align: ta }, text: { size: xs, color: 'color1', align: xa } });
+export const DEFAULT_STYLE = {
+  hero: DS('size5', 'center', 'size3', 'center'),
+  chess: DS('size4', 'left', 'size3', 'left'),
+  tiles: DS('size4', 'center', 'size3', 'center'),
+  roll: DS('size4', 'left', 'size3', 'left'),
+  text: DS('size5', 'center', 'size3', 'center'),
+  faq: DS('size4', 'left', 'size3', 'left'),
+  numlist: DS('size4', 'left', 'size3', 'left'),
+  catalog: DS('size4', 'left', 'size3', 'left'),
+  table: DS('size4', 'left', 'size3', 'left'),
+  video: DS('size4', 'left', 'size3', 'left'),
+};
+export const getStyle = (b, which) => ({ ...DEFAULT_STYLE[b.type][which], ...((b.style || {})[which] || {}) });
 
 // Размеры по умолчанию, пока картинка не загрузилась и её размер неизвестен.
 export const DEFAULT_SIZE = {
@@ -36,8 +71,11 @@ export function newBlock(type) {
     case 'chess': return { id: uid(), type, items: [1, 2].map(() => ({ title: 'Заголовок', text: 'Текст до 260 знаков: на телефоне он идёт под картинкой.', img: img() })) };
     case 'tiles': return { id: uid(), type, items: [1, 2, 3].map(() => ({ title: 'Название', text: 'Подпись', sku: '', img: img() })) };
     case 'roll': return { id: uid(), type, items: [{ sku: '', link: '', img: img() }] };
-    case 'text': return { id: uid(), type, title: 'Заголовок раздела', text: '', theme: 'primary' };
+    case 'text': return { id: uid(), type, title: 'Заголовок раздела', text: '', theme: 'primary', linkLabel: '', linkUrl: '' };
     case 'faq': return { id: uid(), type, items: [{ q: 'Вопрос', a: 'Ответ.' }] };
+    case 'numlist': return { id: uid(), type, items: [{ q: 'Шаг', a: 'Описание шага.' }, { q: 'Шаг', a: 'Описание шага.' }] };
+    case 'table': return { id: uid(), type, title: 'Сколько чашек в упаковке', head: ['Фасовка', 'Кусочков', 'Чашек'], rows: [['8 г', '15', '15'], ['25 г', '50', '50']] };
+    case 'video': return { id: uid(), type, mode: 'youtube', youtube: '', src: '', w: 1280, h: 720 };
     case 'catalog': return { id: uid(), type, items: [{ title: 'Название чая', sku: '', text: 'Одна строка о вкусе.', img: img() }] };
     default: throw new Error(`Неизвестный тип блока: ${type}`);
   }
@@ -58,15 +96,17 @@ export function resolveImage(type, img = {}) {
 
 // ---------- Текст ----------
 
-function textObj(str, size = 'size3', align = 'left', href = '') {
+function textObj(str, fmt, href = '') {
+  const { size = 'size3', align = 'left', color = 'color1' } = fmt || {};
   const items = [];
   String(str ?? '').split('\n').forEach((line, i) => {
     if (i) items.push({ type: 'br' });
     if (href && i === 0) items.push({ type: 'link', content: line, href });
     else items.push({ type: 'text', content: line });
   });
-  return { size, align, color: 'color1', items };
+  return { size, align, color, items };
 }
+const fmtOf = (t) => (t ? { size: t.size, color: t.color, align: t.align } : {});
 
 export function readText(t) {
   if (!t) return '';
@@ -100,16 +140,16 @@ export function toOzon(blocks) {
       content.push({ widgetName: 'raShowcase', type: 'billboard', blocks: [{
         img: { src: r.src, srcMobile: r.srcM, alt: b.title || '', width: r.w, height: r.h, widthMobile: r.wM, heightMobile: r.hM },
         imgLink: '',
-        title: textObj(b.title, 'size5', 'center'),
-        text: textObj(b.text, 'size3', 'center'),
+        title: textObj(b.title, getStyle(b, 'title')),
+        text: textObj(b.text, getStyle(b, 'text')),
       }] });
     } else if (b.type === 'chess') {
       content.push({ widgetName: 'raShowcase', type: 'chess', blocks: b.items.map((it, i) => ({
         img: imgShowcase('chess', it.img, it.title, 'fill'),
         imgLink: '',
         reverse: i % 2 === 1,
-        title: textObj(it.title, 'size4'),
-        text: textObj(it.text),
+        title: textObj(it.title, getStyle(b, 'title')),
+        text: textObj(it.text, getStyle(b, 'text')),
       })) });
     } else if (b.type === 'tiles') {
       content.push({ widgetName: 'raShowcase', type: 'tileL', blocks: b.items.map((it) => {
@@ -117,8 +157,8 @@ export function toOzon(blocks) {
         return {
           img: imgShowcase('tiles', it.img, it.title, 'to_the_edge'),
           imgLink: href,
-          title: textObj(it.title, 'size4', 'center', href),
-          text: textObj(it.text, 'size3', 'center'),
+          title: textObj(it.title, getStyle(b, 'title'), href),
+          text: textObj(it.text, getStyle(b, 'text')),
         };
       }) });
     } else if (b.type === 'roll') {
@@ -127,22 +167,49 @@ export function toOzon(blocks) {
         imgLink: productUrl(it.sku) || (isOzonUrl(it.link) ? it.link : ''),
       })) });
     } else if (b.type === 'text') {
+      const text = textObj(b.text || '', getStyle(b, 'text'));
+      const href = isOzonUrl(b.linkUrl) ? b.linkUrl : '';
+      if (b.linkLabel && href) {
+        if (text.items.length && !(text.items.length === 1 && !text.items[0].content)) text.items.push({ type: 'br' });
+        else text.items = [];
+        text.items.push({ type: 'link', content: b.linkLabel, href });
+      }
       content.push({ widgetName: 'raTextBlock', theme: b.theme || 'primary', padding: 'type2', gapSize: 'm',
-        title: textObj(b.title, 'size5', 'center'), text: textObj(b.text || '', 'size3', 'center') });
-    } else if (b.type === 'faq') {
-      content.push({ widgetName: 'list', theme: 'bullet', blocks: b.items.map((it) => ({ title: textObj(it.q, 'size4'), text: textObj(it.a) })) });
+        title: textObj(b.title, getStyle(b, 'title')), text });
+    } else if (b.type === 'faq' || b.type === 'numlist') {
+      content.push({ widgetName: 'list', theme: b.type === 'faq' ? 'bullet' : 'number',
+        blocks: b.items.map((it) => ({ title: textObj(it.q, getStyle(b, 'title')), text: textObj(it.a, getStyle(b, 'text')) })) });
     } else if (b.type === 'catalog') {
       content.push({ widgetName: 'list', theme: 'image', blocks: b.items.map((it) => ({
         img: imgShowcase('catalog', it.img, it.title, 'to_the_edge'),
-        title: textObj(it.title, 'size4', 'left', productUrl(it.sku)),
-        text: textObj(it.text),
+        title: textObj(it.title, getStyle(b, 'title'), productUrl(it.sku)),
+        text: textObj(it.text, getStyle(b, 'text')),
       })) });
+    } else if (b.type === 'table') {
+      const st = getStyle(b, 'text');
+      content.push({ widgetName: 'raTable', title: textObj(b.title, getStyle(b, 'title')), table: {
+        head: b.head.map((h) => ({ text: [h], contentAlign: st.align, size: st.size, color: st.color })),
+        body: b.rows.map((r) => b.head.map((_, i) => [r[i] ?? ''])),
+      } });
+    } else if (b.type === 'video') {
+      if (b.mode === 'youtube') content.push({ widgetName: 'raVideo', type: 'youtube', id: youtubeId(b.youtube) });
+      else content.push({ widgetName: 'raVideo', type: 'embedded', width: Number(b.w) || 1280, height: Number(b.h) || 720,
+        sources: [{ type: videoMime(b.src), src: b.src }] });
     }
   }
   return { content, version: 0.3 };
 }
 
 export const isOzonUrl = (u) => /^https:\/\/(www\.)?ozon\.ru\//.test(String(u || ''));
+export const questionsUrl = (sku) => (productUrl(sku) ? `${productUrl(sku)}questions/` : '');
+// Ссылку YouTube любого вида превращаем в идентификатор ролика.
+export function youtubeId(v) {
+  const s = String(v || '').trim();
+  const m = s.match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : s;
+}
+const MIME = { mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', ogg: 'video/ogg', mpeg: 'video/mpeg', '3gp': 'video/3gpp' };
+export const videoMime = (src) => MIME[(String(src).split('?')[0].split('.').pop() || '').toLowerCase()] || 'video/mp4';
 
 // ---------- Импорт из JSON Ozon ----------
 
@@ -156,6 +223,15 @@ function readImg(img = {}) {
   return { src: src || mob, srcM: '', w: img.width || img.widthMobile || 0, h: img.height || img.heightMobile || 0, wM: 0, hM: 0 };
 }
 
+const clean = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v));
+function styleOf(x) {
+  if (!x) return {};
+  const st = {};
+  if (x.title) st.title = clean(fmtOf(x.title));
+  if (x.text) st.text = clean(fmtOf(x.text));
+  return st;
+}
+
 export function fromOzon(json) {
   const data = typeof json === 'string' ? JSON.parse(json) : json;
   if (!data || !Array.isArray(data.content)) throw new Error('В коде нет списка блоков «content». Это не rich-контент Ozon.');
@@ -164,26 +240,40 @@ export function fromOzon(json) {
   for (const w of data.content) {
     const bl = Array.isArray(w.blocks) ? w.blocks : [];
     if (w.widgetName === 'raShowcase' && w.type === 'billboard' && bl[0]) {
-      out.push({ id: uid(), type: 'hero', title: readText(bl[0].title), text: readText(bl[0].text), img: readImg(bl[0].img) });
+      out.push({ id: uid(), type: 'hero', title: readText(bl[0].title), text: readText(bl[0].text), img: readImg(bl[0].img), style: styleOf(bl[0]) });
     } else if (w.widgetName === 'raShowcase' && w.type === 'chess') {
       // Подряд идущие шахматки по одному блоку склеиваем в одну.
       const items = bl.map((x) => ({ title: readText(x.title), text: readText(x.text), img: readImg(x.img) }));
       const last = out[out.length - 1];
       if (last && last.type === 'chess' && last._merge) last.items.push(...items);
-      else out.push({ id: uid(), type: 'chess', items, _merge: true });
+      else out.push({ id: uid(), type: 'chess', items, _merge: true, style: styleOf(bl[0]) });
     } else if (w.widgetName === 'raShowcase' && ['tileL', 'tileXL', 'tileM', 'tileSecondary'].includes(w.type)) {
-      out.push({ id: uid(), type: 'tiles', items: bl.map((x) => ({ title: readText(x.title), text: readText(x.text), sku: skuFromUrl(x.imgLink || readLink(x.title)), img: readImg(x.img) })) });
+      out.push({ id: uid(), type: 'tiles', style: styleOf(bl[0]), items: bl.map((x) => ({ title: readText(x.title), text: readText(x.text), sku: skuFromUrl(x.imgLink || readLink(x.title)), img: readImg(x.img) })) });
     } else if (w.widgetName === 'raShowcase' && w.type === 'roll') {
       const items = bl.map((x) => ({ sku: skuFromUrl(x.imgLink), link: skuFromUrl(x.imgLink) ? '' : x.imgLink || '', alt: (x.img || {}).alt || '', img: readImg(x.img) }));
       const last = out[out.length - 1];
       if (last && last.type === 'roll' && last._merge) last.items.push(...items);
       else out.push({ id: uid(), type: 'roll', items, _merge: true });
     } else if (w.widgetName === 'raTextBlock') {
-      out.push({ id: uid(), type: 'text', title: readText(w.title), text: readText(w.text), theme: w.theme || 'primary' });
+      // Ссылку в конце текста выносим в отдельные поля, остальное — текст.
+      const items = (w.text && w.text.items) || [];
+      const last = items[items.length - 1];
+      const hasLink = last && last.type === 'link';
+      const rest = hasLink ? { ...w.text, items: items.slice(0, -1).filter((it, i, a) => !(i === a.length - 1 && it.type === 'br')) } : w.text;
+      out.push({ id: uid(), type: 'text', title: readText(w.title), text: readText(rest), theme: w.theme || 'primary',
+        linkLabel: hasLink ? last.content : '', linkUrl: hasLink ? last.href : '', style: styleOf(w) });
     } else if (w.widgetName === 'list' && w.theme === 'image') {
-      out.push({ id: uid(), type: 'catalog', items: bl.map((x) => ({ title: readText(x.title), sku: skuFromUrl(readLink(x.title) || x.imgLink), text: readText(x.text), img: readImg(x.img) })) });
+      out.push({ id: uid(), type: 'catalog', style: styleOf(bl[0]), items: bl.map((x) => ({ title: readText(x.title), sku: skuFromUrl(readLink(x.title) || x.imgLink), text: readText(x.text), img: readImg(x.img) })) });
     } else if (w.widgetName === 'list') {
-      out.push({ id: uid(), type: 'faq', items: bl.map((x) => ({ q: readText(x.title), a: readText(x.text) })) });
+      out.push({ id: uid(), type: w.theme === 'number' ? 'numlist' : 'faq', style: styleOf(bl[0]), items: bl.map((x) => ({ q: readText(x.title), a: readText(x.text) })) });
+    } else if (w.widgetName === 'raTable' && w.table) {
+      const cell = (c) => (Array.isArray(c) ? c.join('\n') : readText(c));
+      const head = (w.table.head || []).map((h) => (Array.isArray(h.text) ? h.text.map((x) => (typeof x === 'string' ? x : x.content || '')).join('') : ''));
+      out.push({ id: uid(), type: 'table', title: readText(w.title), head, rows: (w.table.body || []).map((r) => r.map(cell)), style: { title: fmtOf(w.title) } });
+    } else if (w.widgetName === 'raVideo') {
+      out.push(w.type === 'youtube'
+        ? { id: uid(), type: 'video', mode: 'youtube', youtube: w.id || '', src: '', w: 1280, h: 720 }
+        : { id: uid(), type: 'video', mode: 'file', youtube: '', src: ((w.sources || [])[0] || {}).src || '', w: w.width || 1280, h: w.height || 720 });
     } else {
       skipped.push(w.widgetName + (w.type ? `:${w.type}` : ''));
     }
@@ -209,6 +299,10 @@ export function check(blocks) {
     if (b.type === 'tiles' && b.items.length > 3) problems.push(`${where}: в ряд помещается не больше 3 плиток`);
     if (['tiles', 'catalog'].includes(b.type)) b.items.forEach((it) => { if (!productUrl(it.sku)) noSku.push(it.title || 'без названия'); });
     if (b.type === 'roll') b.items.forEach((it, i) => { if (it.link && !isOzonUrl(it.link)) problems.push(`${where}, картинка ${i + 1}: ссылка ведёт не на ozon.ru, Ozon такие запрещает`); });
+    if (b.type === 'text' && (b.linkLabel || b.linkUrl) && !(b.linkLabel && isOzonUrl(b.linkUrl))) problems.push(`${where}: у кнопки-ссылки нужны и подпись, и адрес на ozon.ru`);
+    if (b.type === 'table' && (!b.head.length || !b.rows.length)) problems.push(`${where}: в таблице нужны столбцы и хотя бы одна строка`);
+    if (b.type === 'video' && b.mode === 'youtube' && !/^[A-Za-z0-9_-]{11}$/.test(youtubeId(b.youtube))) problems.push(`${where}: вставьте ссылку на ролик YouTube`);
+    if (b.type === 'video' && b.mode === 'file' && !/^https:\/\/\S+\.(mp4|webm|mov|ogg|mpeg|3gp)(\?\S*)?$/i.test(b.src || '')) problems.push(`${where}: нужна прямая ссылка на видеофайл .mp4`);
   });
   const empty = imgs.filter(([, u]) => !u);
   const bad = imgs.filter(([, u]) => u && !IMG_RE.test(u));

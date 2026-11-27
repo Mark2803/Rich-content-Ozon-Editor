@@ -12,7 +12,10 @@
 
 ## Формат Ozon
 
-- JSON rich-контента версии 0.3. Виджеты и поля скопированы с живых карточек Ozon (ноябрь 2026): `raShowcase` (`billboard`, `chess`, `tileL`, `roll`), `raTextBlock`, `list` (`bullet`, `image`).
+- JSON rich-контента версии 0.3. Поля сверены с официальной схемой https://st.ozone.ru/s3/artifact/schema.json и живыми карточками (ноябрь 2026): `raShowcase` (`billboard`, `chess`, `tileL`, `roll`), `raTextBlock` (с кнопкой-ссылкой в конце текста), `list` (`bullet`, `image`, `number`), `raTable`, `raVideo` (`youtube`, `embedded`).
+- Текст: только размер `size1`–`size7` (12–38 px), цвет `color1`–`color4` и выравнивание; шрифт, жирный и курсив Ozon не даёт. Стиль блока — поле `style: {title, text}`, значения по умолчанию — `DEFAULT_STYLE` в `public/rich.js`.
+- Эмодзи и символы — обычный Юникод (`public/emoji.js`); в песочнице Ozon показываются, поведение на модерации не проверено.
+- Прямой ссылки на чат с продавцом у Ozon нет; кнопка ведёт на вопросы о товаре (`/product/SKU/questions/`) или страницу магазина.
 - Картинка — прямая ссылка на `.jpg`/`.jpeg`/`.png`. Ссылки — только на ozon.ru.
 - В шахматке 2–6 блоков. Карусели, анимации, GIF и HTML Ozon не поддерживает.
 - Картинку для телефона, если её нет, берём из ПК (`resolveImage` в `public/rich.js`), и наоборот.
