@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Редактор rich-контента Ozon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="gate" class="gate" hidden>
+  <div class="gate-card">
+    <div class="mark" aria-hidden="true"></div>
+    <h1>Редактор rich-контента</h1>
+    <p id="gate-msg">Откройте редактор из раздела «Менеджмент» в админке сайта: ссылка там действует 60 минут.</p>
+  </div>
+</div>
+
+<header class="top">
+  <div class="brand"><div class="mark" aria-hidden="true"></div><div><b>Редактор rich-контента</b><span>для карточек Ozon</span></div></div>
+  <div class="proj">
+    <label class="sr" for="proj-name">Название шаблона</label>
+    <input id="proj-name" placeholder="Название шаблона">
+    <select id="open" aria-label="Открыть шаблон"></select>
+  </div>
+  <div class="acts">
+    <div class="seg" role="group" aria-label="Вид">
+      <button id="v-pc" aria-pressed="true">Компьютер</button>
+      <button id="v-m" aria-pressed="false">Телефон</button>
+    </div>
+    <button id="undo" class="ghost" title="Отменить (Ctrl+Z)">Отменить</button>
+    <button id="import" class="ghost">Импорт JSON</button>
+    <button id="save" class="ghost">Сохранить</button>
+    <button id="export" class="blue">Получить JSON</button>
+  </div>
+</header>
+
+<main class="work">
+  <aside class="panel blocks" aria-label="Блоки">
+    <div class="ph"><h2>Блоки</h2><span id="count"></span></div>
+    <ol id="list"></ol>
+    <div class="add">
+      <label for="add-type">Добавить блок</label>
+      <div class="add-row"><select id="add-type"></select><button id="add" class="blue">Добавить</button></div>
+    </div>
+  </aside>
+
+  <section class="stage" aria-label="Предпросмотр">
+    <p class="hint" id="hint">Нажмите на блок, чтобы выбрать. Заголовки и тексты можно править прямо здесь — вид для телефона меняется сам.</p>
+    <div id="frame" class="frame pc"><div id="pv" class="pv"></div></div>
+  </section>
+
+  <aside class="panel insp" aria-label="Настройки блока">
+    <div class="ph"><h2 id="insp-title">Блок</h2></div>
+    <div id="insp"></div>
+    <div class="checks"><h3>Проверка</h3><ul id="checks"></ul></div>
+  </aside>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" class="dlg">
+    <h2 id="dlg-title"></h2>
+    <p id="dlg-text" class="muted"></p>
+    <textarea id="dlg-area" spellcheck="false"></textarea>
+    <p id="dlg-msg" class="msg" aria-live="polite"></p>
+    <div class="dlg-acts">
+      <button value="cancel" class="ghost" id="dlg-cancel">Закрыть</button>
+      <button id="dlg-ok" class="blue" value="ok"></button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

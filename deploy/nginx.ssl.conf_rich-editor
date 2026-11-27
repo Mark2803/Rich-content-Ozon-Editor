@@ -1,0 +1,12 @@
+# Вставить внутрь блока server { ... } сайта tea-master-team.ru (рядом с wb-funnel).
+# Адрес без косой черты в конце ведёт на адрес с ней, иначе не загрузятся стили и скрипты.
+location = /management/rich-editor {
+    return 301 /management/rich-editor/;
+}
+location /management/rich-editor/ {
+    proxy_pass http://127.0.0.1:3400/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 3m;
+}
