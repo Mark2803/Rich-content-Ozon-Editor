@@ -253,3 +253,17 @@ test('инфографика вкуса: 6 видов, в Ozon уходит ка
   for (const k of Object.keys(CHART_KINDS)) { b.kind = k; assert.ok(chartAlt(b).length > 15, k); }
   b.kind = 'map'; assert.match(chartAlt(b), /Шу пуэр — Крепкий, Бодрит/);
 });
+
+test('одна плитка — во всю ширину; длинный текст в шахматке — не ошибка', async () => {
+  const { tileRows } = await import('../public/rich.js');
+  assert.deepEqual(tileRows(1), [{ type: 'billboard', count: 1 }]);
+  assert.deepEqual(tileRows(1, '3'), [{ type: 'billboard', count: 1 }]);
+  const t = newBlock('tiles'); t.items = [t.items[0]]; t.items[0].sku = '5211050462';
+  const w = toOzon([t]).content[0];
+  assert.equal(w.type, 'billboard');
+  assert.equal(w.blocks[0].imgLink, 'https://www.ozon.ru/product/5211050462/');
+  const back = fromOzon(toOzon([t])).blocks[0];
+  assert.equal(back.type, 'tiles'); assert.equal(back.items.length, 1); assert.equal(back.items[0].sku, '5211050462');
+  const c = newBlock('chess'); c.items[0].text = 'а'.repeat(800);
+  assert.deepEqual(check([c]).filter((p) => p.includes('знак')), []);
+});

@@ -151,7 +151,7 @@ function blocksHtml(blocks) {
         const part = b.items.slice(from, from + row.count).map((it, k) => { const i = from + k;
           return `<div>${imgHtml('tiles', it.img, it.title)}${ed(b, `items.${i}.title`, it.title, 's4 c')}${ed(b, `items.${i}.text`, it.text, 's3 c')}</div>`; }).join('');
         from += row.count;
-        return `<div class="tiles" style="--n:${row.type === 'tileXL' ? 2 : row.type === 'tileM' ? 4 : 3}">${part}</div>`;
+        return `<div class="tiles" style="--n:${row.type === 'billboard' ? 1 : row.type === 'tileXL' ? 2 : row.type === 'tileM' ? 4 : 3}">${part}</div>`;
       }).join('');
     }
     if (b.type === 'roll') inner = b.items.map((it) => imgHtml('roll', it.img, it.alt || 'Картинка во всю ширину')).join('');
@@ -351,7 +351,7 @@ function linkEditor(b) {
 
 function itemFields(b, it, i) {
   const p = `items.${i}`;
-  if (b.type === 'chess') return fld(`${p}.title`, 'Заголовок', it.title) + fld(`${p}.text`, `Текст (${(it.text || '').length} из 260)`, it.text, { area: 1 }) + imgFields('chess', `${p}.img`, it.img);
+  if (b.type === 'chess') return fld(`${p}.title`, 'Заголовок', it.title) + fld(`${p}.text`, `Текст — ${(it.text || '').length} знаков`, it.text, { area: 1 }) + imgFields('chess', `${p}.img`, it.img);
   if (b.type === 'tiles') return fld(`${p}.title`, 'Название', it.title) + fld(`${p}.text`, 'Подпись', it.text) + fld(`${p}.sku`, 'SKU Ozon — куда ведёт плитка', it.sku, { mode: 'numeric' }) + imgFields('tiles', `${p}.img`, it.img);
   if (b.type === 'roll') return fld(`${p}.sku`, 'SKU Ozon — куда ведёт картинка', it.sku, { mode: 'numeric' }) + fld(`${p}.link`, 'Или ссылка на страницу Ozon', it.link, { ph: 'https://www.ozon.ru/…' }) + fld(`${p}.alt`, 'Описание картинки', it.alt) + imgFields('roll', `${p}.img`, it.img);
   if (b.type === 'cards') return fld(`${p}.title`, 'Заголовок', it.title) + fld(`${p}.text`, 'Текст', it.text) + fld(`${p}.sku`, 'SKU Ozon — необязательно, если карточка должна вести на товар', it.sku, { mode: 'numeric' }) + imgFields('cards', `${p}.img`, it.img) + '<p class="note">Значок Ozon показывает маленьким: 50×50 на компьютере, 40×40 на телефоне. Подойдёт квадратная картинка 200×200.</p>';
@@ -378,9 +378,9 @@ function renderInspector() {
   if (b.type === 'video') html = videoEditor(b);
   if (b.type === 'tiles') {
     const rows = tileRows(b.items.length, b.layout || 'auto');
-    const scheme = rows.flatMap((r) => { const out = []; let left = r.count; const per = r.type === 'tileXL' ? 2 : r.type === 'tileM' ? 4 : 3; while (left > 0) { out.push(`${Math.min(per, left)}${r.type === 'tileXL' ? ' крупные' : r.type === 'tileM' ? ' мелкие' : ''}`); left -= per; } return out; }).join(' / ') || '—';
+    const scheme = rows.flatMap((r) => { if (r.type === 'billboard') return ['1 во всю ширину']; const out = []; let left = r.count; const per = r.type === 'tileXL' ? 2 : r.type === 'tileM' ? 4 : 3; while (left > 0) { out.push(`${Math.min(per, left)}${r.type === 'tileXL' ? ' крупные' : r.type === 'tileM' ? ' мелкие' : ''}`); left -= per; } return out; }).join(' / ') || '—';
     html += `<div class="grp"><label for="f-layout">Раскладка плиток</label><select id="f-layout" data-f="layout">${Object.entries(TILE_LAYOUTS).map(([v, t]) => `<option value="${v}" ${(b.layout || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-      <p class="note">Ряды на компьютере: <b>${esc(scheme)}</b>. Ozon прижимает неполный ряд к левому краю, поэтому в «Авто» ряд из двух делается крупными плитками на всю ширину — он стоит ровно по центру. На телефоне плитки идут по одной.</p></div>`;
+      <p class="note">Ряды на компьютере: <b>${esc(scheme)}</b>. Ozon прижимает неполный ряд к левому краю, поэтому в «Авто» ряд из двух делается крупными плитками на всю ширину — он стоит ровно по центру. На телефоне плитки идут по одной.${b.items.length === 1 ? ' <b>Одна плитка растягивается во всю ширину</b> — для неё лучше широкая картинка, например 1416×708: квадратная будет очень высокой.' : ''}</p></div>`;
   }
   if (b.items) {
     html += b.items.map((it, i) => `<div class="grp"><div class="gh"><b>${ITEM_NAMES[b.type]} ${i + 1}</b><span>

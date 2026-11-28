@@ -119,7 +119,7 @@ export function newBlock(type) {
   const img = emptyImage;
   switch (type) {
     case 'hero': return { id: uid(), type, title: 'Заголовок', text: 'Короткий текст под заголовком.', img: img() };
-    case 'chess': return { id: uid(), type, items: [1, 2].map(() => ({ title: 'Заголовок', text: 'Текст до 260 знаков: на телефоне он идёт под картинкой.', img: img() })) };
+    case 'chess': return { id: uid(), type, items: [1, 2].map(() => ({ title: 'Заголовок', text: 'Текст: на телефоне он идёт под картинкой.', img: img() })) };
     case 'tiles': return { id: uid(), type, layout: 'auto', items: [1, 2, 3].map(() => ({ title: 'Название', text: 'Подпись', sku: '', img: img() })) };
     case 'roll': return { id: uid(), type, items: [{ sku: '', link: '', img: img() }] };
     case 'text': return { id: uid(), type, title: 'Заголовок раздела', text: '', theme: 'primary', linkLabel: '', linkUrl: '' };
@@ -234,11 +234,13 @@ const cellOut = (s) => (hasLinks(s) ? { items: textObj(s).items } : String(s ?? 
 export const TILE_LAYOUTS = { auto: 'Авто: ровные ряды', 3: 'Все по 3 в ряд', 2: 'Все по 2 в ряд, крупные', 4: 'Все по 4 в ряд, мелкие' };
 export function tileRows(n, layout = 'auto') {
   if (n <= 0) return [];
+  // Одна плитка — во всю ширину (billboard), чтобы справа не оставалось пустого места.
+  if (n === 1) return [{ type: 'billboard', count: 1 }];
   if (layout === '4' || layout === 4) return [{ type: 'tileM', count: n }];
   if (layout === '3' || layout === 3) return [{ type: 'tileL', count: n }];
   if (layout === '2' || layout === 2) return [{ type: 'tileXL', count: n }];
   if (n === 2 || n === 4) return [{ type: 'tileXL', count: n }];
-  if (n % 3 === 0 || n === 1) return [{ type: 'tileL', count: n }];
+  if (n % 3 === 0) return [{ type: 'tileL', count: n }];
   if (n % 3 === 2) return [{ type: 'tileL', count: n - 2 }, { type: 'tileXL', count: 2 }];
   return [{ type: 'tileL', count: n - 4 }, { type: 'tileXL', count: 4 }];
 }
@@ -388,7 +390,11 @@ export function fromOzon(json) {
   const skipped = [];
   for (const w of data.content) {
     const bl = Array.isArray(w.blocks) ? w.blocks : [];
-    if (w.widgetName === 'raShowcase' && w.type === 'billboard' && bl[0]) {
+    if (w.widgetName === 'raShowcase' && w.type === 'billboard' && bl[0] && bl[0].imgLink) {
+      // Обложка со ссылкой на товар — это плитка во всю ширину.
+      const x = bl[0];
+      out.push({ id: uid(), type: 'tiles', layout: 'auto', style: styleOf(x), items: [{ title: readText(x.title), text: readRich(x.text), sku: skuFromUrl(x.imgLink || readLink(x.title)), img: readImg(x.img) }] });
+    } else if (w.widgetName === 'raShowcase' && w.type === 'billboard' && bl[0]) {
       out.push({ id: uid(), type: 'hero', title: readRich(bl[0].title), text: readRich(bl[0].text), img: readImg(bl[0].img), style: styleOf(bl[0]) });
     } else if (w.widgetName === 'raShowcase' && w.type === 'chess') {
       // Подряд идущие шахматки по одному блоку склеиваем в одну.
@@ -480,7 +486,6 @@ export function check(blocks) {
     if (b.type === 'cards' && b.items.length < 1) problems.push(`${where}: добавьте хотя бы одну карточку`);
     list.forEach((img) => { const r = resolveImage(b.type, img); imgs.push([where, r.src], [where, r.srcM]); });
     if (b.type === 'chess' && (b.items.length < 2 || b.items.length > 6)) problems.push(`${where}: нужно от 2 до 6 блоков, сейчас ${b.items.length}`);
-    if (b.type === 'chess') b.items.forEach((it, i) => { if ((it.text || '').length > 260) problems.push(`${where}, блок ${i + 1}: текст длиннее 260 знаков, на телефоне это простыня`); });
     if (['tiles', 'catalog'].includes(b.type)) b.items.forEach((it) => { if (!productUrl(it.sku)) noSku.push(it.title || 'без названия'); });
     if (b.type === 'roll') b.items.forEach((it, i) => { if (it.link && !isOzonUrl(it.link)) problems.push(`${where}, картинка ${i + 1}: ссылка ведёт не на ozon.ru, Ozon такие запрещает`); });
     if (b.type === 'text' && (b.linkLabel || b.linkUrl) && !(b.linkLabel && isOzonUrl(b.linkUrl))) problems.push(`${where}: у кнопки-ссылки нужны и подпись, и адрес на ozon.ru`);
