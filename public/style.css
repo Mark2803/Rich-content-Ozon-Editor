@@ -242,3 +242,13 @@ dialog.lib[open]{display:flex;flex-direction:column}
 .kinds button{flex:1 1 30%}
 .inl{display:flex;align-items:center;gap:6px;font-size:13px;margin:0}
 .inl select{width:auto;padding:4px 8px}
+
+/* Свои цвета */
+.pals{grid-template-columns:1fr 1fr}
+.pal span{width:16px;height:16px}
+input.clr{width:30px;height:30px;padding:0;border:2px solid var(--line);border-radius:50%;background:none;cursor:pointer;overflow:hidden}
+input.clr::-webkit-color-swatch-wrapper{padding:0}
+input.clr::-webkit-color-swatch{border:0;border-radius:50%}
+input.clr::-moz-color-swatch{border:0;border-radius:50%}
+.owns{display:flex;gap:16px;flex-wrap:wrap;margin:8px 0}
+.clrl{display:flex;align-items:center;gap:6px;font-size:13px;margin:0}

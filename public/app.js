@@ -3,7 +3,7 @@
 // сразу видна в другом. Картинка для телефона подставляется из ПК, если своей нет.
 import { DEFAULT_SIZE, TILE_LAYOUTS, tileRows, MARKS, scale, LINK_RE, emptyImage, iconFor, LOOKS, CHART_KINDS, TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
 import { EMOJI, SYMBOLS } from './emoji.js';
-import { PALETTES, pictureOf, downloadPicture, fontsReady } from './picture.js';
+import { PALETTES, paletteOf, colorOf, pictureOf, downloadPicture, fontsReady } from './picture.js';
 import { PRESETS } from './presets.js';
 
 const $ = (id) => document.getElementById(id);
@@ -226,7 +226,14 @@ function lookEditor(b) {
 // Цвета картинки, скачивание и ссылки — общие для всех блоков-картинок.
 function picSteps(b) {
   const pal = b.palette || 'shu';
-  return `<label>Цвета картинки</label><div class="pals">${Object.entries(PALETTES).map(([k, p]) => `<button type="button" class="pal ${pal === k ? 'on' : ''}" data-act="palette" data-v="${k}" title="${esc(p.name)}"><span style="background:${p.bg}"></span><span style="background:${p.accents[0]}"></span><span style="background:${p.accents[1]}"></span><span style="background:${p.head}"></span><small>${esc(p.name)}</small></button>`).join('')}</div>
+  const P = paletteOf(b);
+  const own = b.own || {};
+  const hasOwn = Boolean(own.bg || own.card || own.ink) || ['teas', 'props', 'sliders', 'segs', 'points', 'notes', 'rows'].some((k) => (b[k] || []).some((x) => x && x.color));
+  return `<label>Цвета картинки — ${Object.keys(PALETTES).length} готовых наборов</label><div class="pals">${Object.entries(PALETTES).map(([k, p]) => `<button type="button" class="pal ${pal === k ? 'on' : ''}" data-act="palette" data-v="${k}" title="${esc(p.name)}"><span style="background:${p.bg}"></span>${p.many.slice(0, 5).map((c) => `<span style="background:${c}"></span>`).join('')}<small>${esc(p.name)}</small></button>`).join('')}</div>
+      <details class="grp own" ${hasOwn ? 'open' : ''}><summary><b>Свои цвета</b> — фон, карточка, текст</summary>
+        <div class="owns">${[['bg', 'Фон'], ['card', 'Карточка'], ['ink', 'Текст']].map(([k, t]) => `<label class="clrl"><input type="color" class="clr" data-f="own.${k}" value="${own[k] || P[k]}"> ${t}</label>`).join('')}</div>
+        <p class="note">Цвет каждого свойства, ноты или точки меняется кружком рядом с ним.</p>
+        <button type="button" class="sm ghost" data-act="ownreset" ${hasOwn ? '' : 'disabled'}>Вернуть цвета набора</button></details>
       <ol class="steps"><li>Скачайте картинки: <button type="button" class="sm blue" data-act="picdl" data-m="0">Для ПК, 1416 px</button> <button type="button" class="sm ghost" data-act="picdl" data-m="1">Для телефона, 640 px</button></li>
       <li>Загрузите их в конструктор rich-контента Ozon и скопируйте ссылки.</li><li>Вставьте ссылки сюда:</li></ol>
       ${imgFields('pic', 'pic', b.pic || emptyImage())}
@@ -237,6 +244,7 @@ function picSteps(b) {
 const numSel = (path, val, from, to, label) => `<select data-f="${path}" data-num="1" aria-label="${esc(label)}">${Array.from({ length: to - from + 1 }, (_, k) => from + k).map((v) => `<option value="${v}" ${Number(val) === v ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
 const inp = (path, val, label, cls = '') => `<input class="${cls}" data-f="${path}" value="${esc(val ?? '')}" aria-label="${esc(label)}" placeholder="${esc(label)}">`;
 const delBtn = (list, i, dis) => `<button type="button" class="icon ghost danger" data-act="cdel" data-list="${list}" data-i="${i}" aria-label="Удалить" ${dis ? 'disabled' : ''}>×</button>`;
+const clr = (b, list, i) => `<input type="color" class="clr" data-f="${list}.${i}.color" value="${colorOf(paletteOf(b), b[list], i)}" aria-label="Цвет" title="Цвет">`;
 const row = (cols, inner) => `<div class="crow" style="grid-template-columns:${cols}">${inner}</div>`;
 const addBtn = (list, text, dis) => `<button type="button" class="sm ghost" data-act="cadd" data-list="${list}" ${dis ? 'disabled' : ''}>${text}</button>`;
 
@@ -247,34 +255,36 @@ function chartEditor(b) {
   let html = `<div class="grp look-grp"><b>Вид схемы</b><div class="seg look kinds" role="group" aria-label="Вид схемы">${Object.entries(CHART_KINDS).map(([v, t]) => `<button type="button" data-act="ckind" data-v="${v}" aria-pressed="${k === v}">${t.name}</button>`).join('')}</div>
     <p class="note">${esc(CHART_KINDS[k].hint)}</p></div>${fld('title', 'Заголовок на картинке', b.title)}`;
   if (usesTeas) {
-    html += `<label>${k === 'sliders' ? 'Чаи (у каждого — своя точка)' : 'Чаи (у каждого — свой цвет)'}</label>${b.teas.map((t, i) => row('1fr 32px', inp(`teas.${i}.name`, t.name, `Чай ${i + 1}`) + delBtn('teas', i, b.teas.length < 2))).join('')}
-      <div class="blk-acts">${addBtn('teas', 'Добавить чай для сравнения', b.teas.length >= 3)}</div>`;
+    html += b.teas.length === 1
+      ? `<p class="note">Один чай: у каждого свойства свой цвет — его можно поменять кружком слева.</p><div class="blk-acts">${addBtn('teas', 'Сравнить с другим чаем', false)}</div>`
+      : `<label>Чаи для сравнения (у каждого свой цвет)</label>${b.teas.map((t, i) => row('34px 1fr 32px', clr(b, 'teas', i) + inp(`teas.${i}.name`, t.name, `Чай ${i + 1}`) + delBtn('teas', i, false))).join('')}
+      <div class="blk-acts">${addBtn('teas', 'Добавить чай', b.teas.length >= 3)}</div>`;
   }
   if (k === 'bars' || k === 'radar') {
     html += `<label>Свойства и оценки ${b.teas.length > 1 ? `(${teaNames.map(esc).join(' / ')})` : ''}</label>
-      ${b.props.map((p, i) => row(`44px minmax(0,1.4fr) repeat(${b.teas.length},minmax(0,1fr)) 32px`, inp(`props.${i}.icon`, p.icon, 'Значок', 'ico') + inp(`props.${i}.name`, p.name, 'Свойство') + b.teas.map((_, ti) => numSel(`props.${i}.vals.${ti}`, p.vals[ti], 0, b.max, `${p.name}: ${teaNames[ti]}`)).join('') + delBtn('props', i, b.props.length < (k === 'radar' ? 4 : 2)))).join('')}
+      ${b.props.map((p, i) => row(`${b.teas.length === 1 ? '34px ' : ''}44px minmax(0,1.4fr) repeat(${b.teas.length},minmax(0,1fr)) 32px`, (b.teas.length === 1 ? clr(b, 'props', i) : '') + inp(`props.${i}.icon`, p.icon, 'Значок', 'ico') + inp(`props.${i}.name`, p.name, 'Свойство') + b.teas.map((_, ti) => numSel(`props.${i}.vals.${ti}`, p.vals[ti], 0, b.max, `${p.name}: ${teaNames[ti]}`)).join('') + delBtn('props', i, b.props.length < (k === 'radar' ? 4 : 2)))).join('')}
       <div class="blk-acts">${addBtn('props', 'Добавить свойство', b.props.length >= 10)}
       <label class="inl">Шкала из <select data-f="max" data-num="1">${[5, 10].map((v) => `<option value="${v}" ${b.max === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>
       ${k === 'radar' ? '<p class="note">Для радара нужно от 3 свойств; красивее всего 5–6.</p>' : ''}`;
   }
   if (k === 'sliders') {
     html += `<label>Шкалы: левый край, правый край и где стоит чай (0 — слева, 10 — справа)</label>
-      ${b.sliders.map((s, i) => row(`minmax(0,1fr) minmax(0,1fr) repeat(${b.teas.length},64px) 32px`, inp(`sliders.${i}.left`, s.left, 'Слева') + inp(`sliders.${i}.right`, s.right, 'Справа') + b.teas.map((_, ti) => numSel(`sliders.${i}.vals.${ti}`, s.vals[ti], 0, 10, `${teaNames[ti]}`)).join('') + delBtn('sliders', i, b.sliders.length < 2))).join('')}
+      ${b.sliders.map((s, i) => row(`${b.teas.length === 1 ? '34px ' : ''}minmax(0,1fr) minmax(0,1fr) repeat(${b.teas.length},64px) 32px`, (b.teas.length === 1 ? clr(b, 'sliders', i) : '') + inp(`sliders.${i}.left`, s.left, 'Слева') + inp(`sliders.${i}.right`, s.right, 'Справа') + b.teas.map((_, ti) => numSel(`sliders.${i}.vals.${ti}`, s.vals[ti], 0, 10, `${teaNames[ti]}`)).join('') + delBtn('sliders', i, b.sliders.length < 2))).join('')}
       <div class="blk-acts">${addBtn('sliders', 'Добавить шкалу', b.sliders.length >= 8)}</div>`;
   }
   if (k === 'wheel') {
     html += `${fld('center', 'Надпись в центре кольца', b.center, { ph: 'Шу пуэр' })}<label>Ноты аромата и их доля (чем больше число, тем шире кусок)</label>
-      ${b.segs.map((s, i) => row('minmax(0,1fr) 72px 32px', inp(`segs.${i}.name`, s.name, 'Нота') + numSel(`segs.${i}.val`, s.val, 1, 10, `${s.name}: доля`) + delBtn('segs', i, b.segs.length < 2))).join('')}
+      ${b.segs.map((s, i) => row('34px minmax(0,1fr) 72px 32px', clr(b, 'segs', i) + inp(`segs.${i}.name`, s.name, 'Нота') + numSel(`segs.${i}.val`, s.val, 1, 10, `${s.name}: доля`) + delBtn('segs', i, b.segs.length < 2))).join('')}
       <div class="blk-acts">${addBtn('segs', 'Добавить ноту', b.segs.length >= 8)}</div>`;
   }
   if (k === 'map') {
     html += `<label>Оси карты</label>${row('1fr 1fr', inp('axes.xl', b.axes.xl, '← Слева') + inp('axes.xr', b.axes.xr, 'Справа →'))}${row('1fr 1fr', inp('axes.yb', b.axes.yb, '↓ Снизу') + inp('axes.yt', b.axes.yt, '↑ Сверху'))}
       <label>Чаи на карте: по горизонтали (0 — «${esc(b.axes.xl)}», 10 — «${esc(b.axes.xr)}») и по вертикали (0 — «${esc(b.axes.yb)}», 10 — «${esc(b.axes.yt)}»)</label>
-      ${b.points.map((p, i) => row('minmax(0,1fr) 64px 64px 32px', inp(`points.${i}.name`, p.name, 'Чай') + numSel(`points.${i}.x`, p.x, 0, 10, `${p.name}: по горизонтали`) + numSel(`points.${i}.y`, p.y, 0, 10, `${p.name}: по вертикали`) + delBtn('points', i, b.points.length < 2))).join('')}
+      ${b.points.map((p, i) => row('34px minmax(0,1fr) 64px 64px 32px', clr(b, 'points', i) + inp(`points.${i}.name`, p.name, 'Чай') + numSel(`points.${i}.x`, p.x, 0, 10, `${p.name}: по горизонтали`) + numSel(`points.${i}.y`, p.y, 0, 10, `${p.name}: по вертикали`) + delBtn('points', i, b.points.length < 2))).join('')}
       <div class="blk-acts">${addBtn('points', 'Добавить чай', b.points.length >= 12)}</div>`;
   }
   if (k === 'notes') {
-    html += `<label>Ноты вкуса: значок и слово</label>${b.notes.map((n, i) => row('44px minmax(0,1fr) 32px', inp(`notes.${i}.icon`, n.icon, 'Значок', 'ico') + inp(`notes.${i}.name`, n.name, 'Нота') + delBtn('notes', i, b.notes.length < 2))).join('')}
+    html += `<label>Ноты вкуса: значок и слово</label>${b.notes.map((n, i) => row('34px 44px minmax(0,1fr) 32px', clr(b, 'notes', i) + inp(`notes.${i}.icon`, n.icon, 'Значок', 'ico') + inp(`notes.${i}.name`, n.name, 'Нота') + delBtn('notes', i, b.notes.length < 2))).join('')}
       <div class="blk-acts">${addBtn('notes', 'Добавить ноту', b.notes.length >= 14)}</div>`;
   }
   return `${html}<div class="grp">${picSteps(b)}</div>`;
@@ -442,6 +452,7 @@ function onField(e) {
   if (pn && b.type === 'chart') { const p = b.props[Number(pn[1])]; if (!p.icon || p.icon === iconFor(p.name)) p.icon = iconFor(val); }
   if (nm && b.type === 'taste') { const row = b.rows[Number(nm[1])]; if (!row.icon || row.icon === iconFor(row.name)) row.icon = iconFor(val); }
   if (f.startsWith('pic.') && !b.pic) b.pic = emptyImage();
+  if (f.startsWith('own.') && !b.own) b.own = {};
   setPath(b, f, val);
   if (f === 'max' && b.type === 'chart') b.props.forEach((p) => { p.vals = p.vals.map((v) => Math.min(v, val)); });
   else if (f === 'max') b.rows.forEach((r) => { r.vals = r.vals.map((v) => Math.min(v, val)); });
@@ -499,6 +510,7 @@ function onAction(e) {
     case 'tasterow': b.rows.push({ name: 'Свойство', icon: '🍵', vals: b.teas.map(() => 0) }); break;
     case 'look': b.look = btn.dataset.v; if (!b.pic) b.pic = emptyImage(); if (!b.palette) b.palette = 'shu'; break;
     case 'palette': b.palette = btn.dataset.v; break;
+    case 'ownreset': delete b.own; ['teas', 'props', 'sliders', 'segs', 'points', 'notes', 'rows'].forEach((k) => (b[k] || []).forEach((x) => { if (x && typeof x === 'object') delete x.color; })); break;
     case 'ckind': b.kind = btn.dataset.v; break;
     case 'cadd': {
       const L = btn.dataset.list; const zeros = () => b.teas.map(() => 0);
@@ -512,6 +524,7 @@ function onAction(e) {
     }
     case 'cdel': {
       const L = btn.dataset.list;
+      if (b[L].length < 2) return;
       b[L].splice(i, 1);
       if (L === 'teas') { b.props.forEach((p) => p.vals.splice(i, 1)); b.sliders.forEach((s) => s.vals.splice(i, 1)); }
       break;

@@ -4,12 +4,43 @@
 // Картинку скачивают, загружают в конструктор rich-контента Ozon и вставляют ссылку.
 import { scale } from './rich.js';
 
+// 10 готовых палитр. В каждой 12 цветов для чаёв, нот и точек — чтобы хватило на всю линейку.
+// Любой цвет можно поменять у конкретного чая, а фон, карточку и текст — у блока («Свои цвета»).
 export const PALETTES = {
-  shu: { many: ['#c8743a', '#6b8e23', '#8b5a2b', '#d9a441', '#a0522d', '#9c7c5c', '#5f7f3a', '#e0915a'], name: 'Шу пуэр — тёплый', bg: '#f6e7d2', card: '#fffaf2', ink: '#3a2418', mute: '#7a5c44', accents: ['#c8743a', '#6b8e23', '#8b5a2b'], empty: '#ead7bd', head: '#3a2418', headInk: '#fff6e8', row: '#fbf1e3' },
-  gaba: { many: ['#2f8f8a', '#b8864b', '#5d7a8c', '#7fae9f', '#8c6d4f', '#3f6f8f', '#c9a36b', '#4f9c94'], name: 'ГАБА — бирюза и камень', bg: '#ece0d0', card: '#fbf7f1', ink: '#2b2a26', mute: '#6b6459', accents: ['#2f8f8a', '#b8864b', '#5d7a8c'], empty: '#ddd0bd', head: '#2f6f6b', headInk: '#ffffff', row: '#f4ece1' },
-  green: { many: ['#4c9a2a', '#d9a441', '#2e7d6b', '#8bbf5a', '#b5862c', '#5b9c86', '#a9c46c', '#7a9a3a'], name: 'Зелёный чай', bg: '#eaf4e2', card: '#f8fcf4', ink: '#1f3a1a', mute: '#5b7552', accents: ['#4c9a2a', '#d9a441', '#2e7d6b'], empty: '#d3e6c6', head: '#3f7f24', headInk: '#ffffff', row: '#f0f7ea' },
-  ozon: { many: ['#005bff', '#f91155', '#10c44c', '#ff9900', '#7b61ff', '#00a3e0', '#ff5c8a', '#2bb673'], name: 'Ozon — голубой', bg: '#eef5ff', card: '#ffffff', ink: '#001a34', mute: '#5b6b7c', accents: ['#005bff', '#f91155', '#10c44c'], empty: '#d6e4fb', head: '#005bff', headInk: '#ffffff', row: '#f5f9ff' },
+  shu: { name: 'Шу пуэр — тёплый', bg: '#f6e7d2', card: '#fffaf2', ink: '#3a2418', mute: '#7a5c44', empty: '#ead7bd', head: '#3a2418', headInk: '#fff6e8', row: '#fbf1e3',
+    many: ['#c8743a', '#6b8e23', '#8b5a2b', '#d9a441', '#a0522d', '#2f8f8a', '#b5485a', '#5f7f3a', '#e0915a', '#7a5c9e', '#9c7c5c', '#3f6f8f'] },
+  gaba: { name: 'ГАБА — бирюза и камень', bg: '#ece0d0', card: '#fbf7f1', ink: '#2b2a26', mute: '#6b6459', empty: '#ddd0bd', head: '#2f6f6b', headInk: '#ffffff', row: '#f4ece1',
+    many: ['#2f8f8a', '#b8864b', '#5d7a8c', '#c4704f', '#7fae9f', '#8c6d4f', '#3f6f8f', '#c9a36b', '#6b5b95', '#4f9c94', '#a3485c', '#7d8f3a'] },
+  green: { name: 'Зелёный чай', bg: '#eaf4e2', card: '#f8fcf4', ink: '#1f3a1a', mute: '#5b7552', empty: '#d3e6c6', head: '#3f7f24', headInk: '#ffffff', row: '#f0f7ea',
+    many: ['#4c9a2a', '#d9a441', '#2e7d6b', '#c0603a', '#8bbf5a', '#5b6fb0', '#b5862c', '#2f8fa0', '#a64d79', '#7a9a3a', '#e07b39', '#3d5a80'] },
+  oolong: { name: 'Улун — золото и нефрит', bg: '#f3ecd5', card: '#fffcf2', ink: '#2e3a1f', mute: '#6d7350', empty: '#e4dcbd', head: '#4f6b2a', headInk: '#ffffff', row: '#f8f3e2',
+    many: ['#b8902d', '#4f8a5b', '#d0753b', '#2f6f5f', '#9bb04a', '#c25a4a', '#6d8fb0', '#a07d3c', '#3e7a8c', '#8a5fa0', '#d4a73b', '#5b7d2a'] },
+  redtea: { name: 'Красный чай — вишня', bg: '#f5e3df', card: '#fffaf8', ink: '#3d1518', mute: '#7d4a4c', empty: '#ecd0cb', head: '#7a1f2b', headInk: '#ffffff', row: '#fbeeeb',
+    many: ['#a3283a', '#d98c3a', '#6b2d5c', '#c4554a', '#3f6f5f', '#e0a83c', '#8c3b2f', '#5a6fa8', '#b85c7a', '#7d8f3a', '#d46a4a', '#4a3b7a'] },
+  white: { name: 'Белый чай — серебро и персик', bg: '#f4f1ec', card: '#ffffff', ink: '#33363a', mute: '#7a7d82', empty: '#e3e0da', head: '#8a8f96', headInk: '#ffffff', row: '#f9f7f3',
+    many: ['#d9967a', '#8fa8b8', '#b7a37a', '#9cb89a', '#c48aa0', '#7a8fc4', '#d8b45c', '#6fa3a0', '#a98bc9', '#c27c5c', '#8b9a6a', '#5c7f9e'] },
+  jasmine: { name: 'Жасмин — цветочный', bg: '#f6eef5', card: '#fffbfe', ink: '#3a2440', mute: '#7d6283', empty: '#eadcec', head: '#6b3f7a', headInk: '#ffffff', row: '#fbf4fb',
+    many: ['#9b5fb0', '#e08aa8', '#6fa86a', '#d9a441', '#5b7fc4', '#c65a7a', '#4f9c94', '#b07acc', '#e0915a', '#7a5c9e', '#8fb84a', '#c4704f'] },
+  dark: { name: 'Тёмный — шоколад', bg: '#241812', card: '#33231a', ink: '#f6e7d2', mute: '#c9ac8c', empty: '#4a3527', head: '#0f0a07', headInk: '#f6e7d2', row: '#2b1d15',
+    many: ['#e0a35a', '#9cc06a', '#e07b5a', '#6fc2b8', '#d9c36b', '#b58ad6', '#f08a9c', '#7aa6e0', '#c9a27a', '#8fd18a', '#f0b45a', '#5ec4d6'] },
+  mono: { name: 'Строгий — графит', bg: '#f2f2f2', card: '#ffffff', ink: '#1d1d1f', mute: '#6e6e73', empty: '#e2e2e4', head: '#1d1d1f', headInk: '#ffffff', row: '#f7f7f8',
+    many: ['#1d1d1f', '#c8743a', '#6e6e73', '#2f8f8a', '#a3283a', '#5b7fc4', '#b5862c', '#4c9a2a', '#7a5c9e', '#8c8c91', '#d0753b', '#3f6f8f'] },
+  ozon: { name: 'Ozon — голубой', bg: '#eef5ff', card: '#ffffff', ink: '#001a34', mute: '#5b6b7c', empty: '#d6e4fb', head: '#005bff', headInk: '#ffffff', row: '#f5f9ff',
+    many: ['#005bff', '#f91155', '#10c44c', '#ff9900', '#7b61ff', '#00a3e0', '#ff5c8a', '#2bb673', '#ffc400', '#3b3b98', '#e0457b', '#00897b'] },
 };
+
+// Палитра блока с учётом своих цветов фона, карточки и текста.
+export function paletteOf(b) {
+  const P = { ...(PALETTES[b.palette] || PALETTES.shu) };
+  const own = b.own || {};
+  for (const k of ['bg', 'card', 'ink']) if (own[k]) P[k] = own[k];
+  if (own.ink) P.mute = own.ink;
+  P.accents = P.many;
+  return P;
+}
+// Цвет чая / ноты / точки: свой, если задан, иначе по порядку из палитры.
+export const colorOf = (P, list, i) => ((list || [])[i] && list[i].color) || P.many[i % P.many.length];
+
 
 const FONT = 'Onest, "Segoe UI", Arial, sans-serif';
 const font = (px, w = 500) => `${w} ${px}px ${FONT}`;
@@ -50,7 +81,7 @@ function canvas(w, h) {
 // Профиль вкуса: название свойства и цветная полоска из делений.
 // mobile — узкая картинка 640 px: подпись над полосками.
 export function tastePicture(b, mobile = false) {
-  const P = PALETTES[b.palette] || PALETTES.shu;
+  const P = paletteOf(b);
   const W = mobile ? 640 : 1416;
   const pad = mobile ? 40 : 80;
   const s = mobile ? 0.62 : 1;
@@ -78,7 +109,7 @@ export function tastePicture(b, mobile = false) {
   // Легенда для сравнения нескольких чаёв
   if (multi) {
     ctx.font = font(labelPx * 0.85, 500);
-    const items = teas.map((t, i) => ({ t: t.name || `Чай ${i + 1}`, col: P.accents[i % P.accents.length] }));
+    const items = teas.map((t, i) => ({ t: t.name || `Чай ${i + 1}`, col: colorOf(P, teas, i) }));
     const sw = labelPx * 0.7;
     const total = items.reduce((a, it) => a + sw + 12 + ctx.measureText(it.t).width + 36, -36);
     let x = W / 2 - total / 2;
@@ -95,7 +126,8 @@ export function tastePicture(b, mobile = false) {
   const barW = W - pad - barX;
   const segGap = Math.round((max > 5 ? 6 : 10) * s);
   const segW = (barW - segGap * (max - 1)) / max;
-  for (const r of b.rows) {
+  // Один чай — у каждого свойства свой цвет; несколько чаёв — у каждого чая свой.
+  b.rows.forEach((r, ri) => {
     ctx.textAlign = 'left'; ctx.fillStyle = P.ink; ctx.font = font(labelPx, 500);
     const label = `${r.icon ? `${r.icon} ` : ''}${r.name || ''}`;
     let by;
@@ -109,18 +141,18 @@ export function tastePicture(b, mobile = false) {
     teas.forEach((_, ti) => {
       const v = Math.max(0, Math.min(max, Math.round(Number(r.vals[ti]) || 0)));
       for (let k = 0; k < max; k++) {
-        ctx.fillStyle = k < v ? P.accents[ti % P.accents.length] : P.empty;
+        ctx.fillStyle = k < v ? (multi ? colorOf(P, b.teas, ti) : colorOf(P, b.rows, ri)) : P.empty;
         roundRect(ctx, barX + k * (segW + segGap), by + ti * (segH + gapBar), segW, segH, Math.min(segH / 2, 14)); ctx.fill();
       }
     });
     y += rowH + rowGap;
-  }
+  });
   return c;
 }
 
 // Таблица: тёмная шапка, строки «зеброй» в цветах бренда, скруглённые углы.
 export function tablePicture(b, mobile = false) {
-  const P = PALETTES[b.palette] || PALETTES.shu;
+  const P = paletteOf(b);
   const W = mobile ? 640 : 1416;
   const pad = mobile ? 32 : 72;
   const s = mobile ? 0.62 : 1;
@@ -194,10 +226,10 @@ function legend(ctx, W, y, items, px, ink) {
     x += widths[i] + 36;
   });
 }
-const teaItems = (b, P) => b.teas.map((t, i) => ({ t: t.name || `Чай ${i + 1}`, col: P.accents[i % P.accents.length] }));
+const teaItems = (b, P) => b.teas.map((t, i) => ({ t: t.name || `Чай ${i + 1}`, col: colorOf(P, b.teas, i) }));
 
 function radarPicture(b, mobile) {
-  const P = PALETTES[b.palette] || PALETTES.shu;
+  const P = paletteOf(b);
   const W = mobile ? 640 : 1416;
   const lab = mobile ? 24 : 34;
   // Радиус подбираем так, чтобы подписи слева и справа не вылезли за край.
@@ -223,13 +255,14 @@ function radarPicture(b, mobile) {
   for (let i = 0; i < n; i++) { const [x, y] = pt(i, 1); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y); ctx.stroke(); }
   // Фигуры чаёв
   b.teas.forEach((_, ti) => {
-    const col = P.accents[ti % P.accents.length];
+    const col = colorOf(P, b.teas, ti);
     ctx.beginPath();
     for (let i = 0; i < n; i++) { const p = b.props[i]; const v = p ? Math.max(0, Math.min(max, Number(p.vals[ti]) || 0)) / max : 0; const [x, y] = pt(i, v); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
     ctx.closePath();
     ctx.globalAlpha = 0.28; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1;
     ctx.strokeStyle = col; ctx.lineWidth = mobile ? 4 : 6; ctx.lineJoin = 'round'; ctx.stroke();
-    for (let i = 0; i < b.props.length; i++) { const v = Math.max(0, Math.min(max, Number(b.props[i].vals[ti]) || 0)) / max; const [x, y] = pt(i, v); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, mobile ? 6 : 9, 0, Math.PI * 2); ctx.fill(); }
+    const one = b.teas.length === 1;
+    for (let i = 0; i < b.props.length; i++) { const v = Math.max(0, Math.min(max, Number(b.props[i].vals[ti]) || 0)) / max; const [x, y] = pt(i, v); ctx.fillStyle = one ? colorOf(P, b.props, i) : col; ctx.beginPath(); ctx.arc(x, y, one ? (mobile ? 10 : 15) : (mobile ? 6 : 9), 0, Math.PI * 2); ctx.fill(); if (one) { ctx.strokeStyle = P.card; ctx.lineWidth = mobile ? 3 : 4; ctx.stroke(); } }
   });
   // Подписи лучей
   ctx.fillStyle = P.ink; ctx.font = font(lab, 500); ctx.textBaseline = 'middle';
@@ -239,6 +272,7 @@ function radarPicture(b, mobile) {
     const cos = Math.cos(a);
     ctx.textAlign = Math.abs(cos) < 0.2 ? 'center' : cos > 0 ? 'left' : 'right';
     const dy = Math.abs(cos) < 0.2 ? (Math.sin(a) < 0 ? -lab * 0.3 : lab * 0.4) : 0;
+    ctx.fillStyle = b.teas.length === 1 ? colorOf(P, b.props, i) : P.ink;
     ctx.fillText(`${p.icon ? `${p.icon} ` : ''}${p.name}`, x, y + dy);
   });
   ctx.textBaseline = 'alphabetic';
@@ -246,7 +280,7 @@ function radarPicture(b, mobile) {
 }
 
 function slidersPicture(b, mobile) {
-  const P = PALETTES[b.palette] || PALETTES.shu;
+  const P = paletteOf(b);
   const W = mobile ? 640 : 1416;
   const pad = mobile ? 40 : 80;
   const lab = mobile ? 28 : 36;
@@ -260,7 +294,7 @@ function slidersPicture(b, mobile) {
   const labW = mobile ? 0 : 300;
   const x0 = pad + (mobile ? 0 : labW + 20); const x1 = W - pad - (mobile ? 0 : labW + 20);
   let y = top;
-  b.sliders.forEach((s) => {
+  b.sliders.forEach((s, si) => {
     ctx.font = font(lab, 500); ctx.fillStyle = P.ink;
     let ty;
     if (mobile) { ctx.textAlign = 'left'; ctx.fillText(s.left, pad, y + lab); ctx.textAlign = 'right'; ctx.fillText(s.right, W - pad, y + lab); ty = y + lab * 1.4 + 20; }
@@ -271,7 +305,7 @@ function slidersPicture(b, mobile) {
     b.teas.forEach((_, ti) => {
       const v = Math.max(0, Math.min(10, Number(s.vals[ti]) || 0));
       const x = x0 + ((x1 - x0) * v) / 10;
-      ctx.fillStyle = P.accents[ti % P.accents.length]; ctx.beginPath(); ctx.arc(x, ty, mobile ? 16 : 22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = b.teas.length === 1 ? colorOf(P, b.sliders, si) : colorOf(P, b.teas, ti); ctx.beginPath(); ctx.arc(x, ty, mobile ? 16 : 22, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = P.card; ctx.lineWidth = mobile ? 4 : 6; ctx.stroke();
     });
     y += rowH;
@@ -280,7 +314,7 @@ function slidersPicture(b, mobile) {
 }
 
 function wheelPicture(b, mobile) {
-  const P = PALETTES[b.palette] || PALETTES.shu;
+  const P = paletteOf(b);
   const W = mobile ? 640 : 1416;
   const pad = mobile ? 40 : 80;
   const R = mobile ? 200 : 280; const r0 = R * 0.55;
@@ -298,7 +332,7 @@ function wheelPicture(b, mobile) {
   segs.forEach((s, i) => {
     const da = (2 * Math.PI * Number(s.val)) / total;
     ctx.beginPath(); ctx.arc(cx, cy, R, a, a + da); ctx.arc(cx, cy, r0, a + da, a, true); ctx.closePath();
-    ctx.fillStyle = P.many[i % P.many.length]; ctx.fill();
+    ctx.fillStyle = colorOf(P, segs, i); ctx.fill();
     ctx.strokeStyle = P.card; ctx.lineWidth = mobile ? 4 : 6; ctx.stroke();
     a += da;
   });
@@ -310,7 +344,7 @@ function wheelPicture(b, mobile) {
     if (mobile) { x = pad + (i % 2) * ((W - pad * 2) / 2); y = top + R * 2 + 50 + Math.floor(i / 2) * lab * 1.7 + lab; }
     else { x = cx + R + 110; y = cy - legH / 2 + i * lab * 1.7 + lab; }
     const sw = lab * 0.8;
-    ctx.fillStyle = P.many[i % P.many.length]; roundRect(ctx, x, y - sw * 0.85, sw, sw, sw / 3); ctx.fill();
+    ctx.fillStyle = colorOf(P, segs, i); roundRect(ctx, x, y - sw * 0.85, sw, sw, sw / 3); ctx.fill();
     ctx.fillStyle = P.ink; ctx.fillText(s.name, x + sw + 14, y);
     if (!mobile) { ctx.fillStyle = P.mute; ctx.fillText(`${Math.round((Number(s.val) / total) * 100)}%`, x + sw + 14 + ctx.measureText(s.name).width + 18, y); }
   });
@@ -318,7 +352,7 @@ function wheelPicture(b, mobile) {
 }
 
 function mapPicture(b, mobile) {
-  const P = PALETTES[b.palette] || PALETTES.shu;
+  const P = paletteOf(b);
   const W = mobile ? 640 : 1416;
   const lab = mobile ? 26 : 34;
   const top = headH(b.title, mobile) + lab * 1.4;
@@ -340,7 +374,7 @@ function mapPicture(b, mobile) {
   b.points.forEach((p, i) => {
     const x = x0 + (S * Math.max(0, Math.min(10, Number(p.x) || 0))) / 10;
     const y = y0 + S - (S * Math.max(0, Math.min(10, Number(p.y) || 0))) / 10;
-    const col = P.many[i % P.many.length];
+    const col = colorOf(P, b.points, i);
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, mobile ? 14 : 20, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = P.card; ctx.lineWidth = mobile ? 4 : 6; ctx.stroke();
     ctx.font = font(lab, 700); ctx.fillStyle = P.ink;
@@ -352,7 +386,7 @@ function mapPicture(b, mobile) {
 }
 
 function notesPicture(b, mobile) {
-  const P = PALETTES[b.palette] || PALETTES.shu;
+  const P = paletteOf(b);
   const W = mobile ? 640 : 1416;
   const pad = mobile ? 40 : 80;
   const px = mobile ? 30 : 44;
@@ -371,7 +405,7 @@ function notesPicture(b, mobile) {
     const tw = line.reduce((a, ch) => a + ch.w, 0) + gap * (line.length - 1);
     let x = (W - tw) / 2;
     line.forEach((ch) => {
-      const col = P.many[k % P.many.length]; k += 1;
+      const col = colorOf(P, b.notes, k); k += 1;
       ctx.fillStyle = col; roundRect(ctx, x, y, ch.w, chipH, chipH / 2); ctx.fill();
       ctx.fillStyle = '#ffffff'; ctx.font = font(px, 500); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(ch.t, x + ch.w / 2, y + chipH / 2 + 2); ctx.textBaseline = 'alphabetic';
@@ -388,7 +422,7 @@ export function chartPicture(b, mobile = false) {
   if (b.kind === 'wheel') return wheelPicture(b, mobile);
   if (b.kind === 'map') return mapPicture(b, mobile);
   if (b.kind === 'notes') return notesPicture(b, mobile);
-  return tastePicture({ title: b.title, palette: b.palette, max: b.max, teas: b.teas, rows: b.props }, mobile);
+  return tastePicture({ title: b.title, palette: b.palette, own: b.own, max: b.max, teas: b.teas, rows: b.props }, mobile);
 }
 
 export const pictureOf = (b, mobile) => (b.type === 'chart' ? chartPicture(b, mobile) : b.type === 'taste' ? tastePicture(b, mobile) : tablePicture(b, mobile));
