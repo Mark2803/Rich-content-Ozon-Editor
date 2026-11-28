@@ -148,3 +148,71 @@ test('плитки: любое количество, ровные ряды', asy
   const two = { version: 0.3, content: [json.content[0], { ...json.content[0] }] };
   assert.equal(fromOzon(two).blocks.length, 2);
 });
+
+test('профиль вкуса: таблица со шкалами, без шапки для одного чая, и обратно', async () => {
+  const { scale } = await import('../public/rich.js');
+  assert.equal(scale(3), '●●●○○');
+  assert.equal(scale(4, 5, 'stars'), '★★★★☆');
+  const b = newBlock('taste');
+  const w = toOzon([b]).content[0];
+  assert.equal(w.widgetName, 'raTable');
+  assert.equal(w.table.hideHead, true);
+  assert.deepEqual(w.table.body[0], [['Крепость'], ['●●●●○']]);
+  // сравнение двух чаёв — с шапкой и картинками
+  b.teas = [{ name: 'Шу пуэр', img: { src: 'https://x.ru/shu.png', srcM: '', w: 300, h: 300, wM: 0, hM: 0 } }, { name: 'ГАБА', img: { src: '', srcM: '', w: 0, h: 0, wM: 0, hM: 0 } }];
+  b.rows.forEach((r) => r.vals.push(1));
+  const w2 = toOzon([b]).content[0];
+  assert.equal(w2.table.hideHead, undefined);
+  assert.equal(w2.table.head[1].img.src, 'https://x.ru/shu.png');
+  assert.equal(w2.table.head[2].img, undefined);
+  const back = fromOzon(toOzon([b])).blocks[0];
+  assert.equal(back.type, 'taste');
+  assert.deepEqual(back.teas.map((t) => t.name), ['Шу пуэр', 'ГАБА']);
+  assert.deepEqual(back.rows[0], { name: 'Крепость', vals: [4, 1] });
+  assert.equal(back.teas[0].img.src, 'https://x.ru/shu.png');
+});
+
+test('таблица: картинки в шапке, без шапки, ссылки в ячейках', () => {
+  const t = newBlock('table');
+  t.headImg = [{ src: 'https://x.ru/a.png', srcM: '', w: 0, h: 0, wM: 0, hM: 0 }];
+  t.rows[0][2] = 'смотреть [8 г](https://www.ozon.ru/product/5211050462/)';
+  let w = toOzon([t]).content[0];
+  assert.equal(w.table.head[0].img.src, 'https://x.ru/a.png');
+  assert.deepEqual(w.table.body[0][2], { items: [{ type: 'text', content: 'смотреть ' }, { type: 'link', content: '8 г', href: 'https://www.ozon.ru/product/5211050462/' }] });
+  const back = fromOzon(toOzon([t])).blocks[0];
+  assert.equal(back.rows[0][2], 'смотреть [8 г](https://www.ozon.ru/product/5211050462/)');
+  assert.equal(back.headImg[0].src, 'https://x.ru/a.png');
+  t.hideHead = true;
+  w = toOzon([t]).content[0];
+  assert.equal(w.table.hideHead, true);
+  assert.equal(w.table.head[0].img, undefined, 'без шапки картинки не отправляем');
+  assert.equal(fromOzon(toOzon([t])).blocks[0].hideHead, true);
+  t.rows[1][0] = '[чужая](https://t.me/x)';
+  assert.ok(check([t]).some((p) => p.includes('не на ozon.ru')));
+  assert.deepEqual(toOzon([t]).content[0].table.body[1][0], { items: [{ type: 'text', content: 'чужая' }] });
+});
+
+test('ссылки внутри обычного текста и отступы текстового блока', () => {
+  const b = newBlock('text');
+  b.text = 'Попробуйте [ГАБА](https://www.ozon.ru/product/5130480628/) вечером';
+  b.pad = 'type1'; b.gap = 's';
+  const w = toOzon([b]).content[0];
+  assert.equal(w.padding, 'type1'); assert.equal(w.gapSize, 's');
+  assert.deepEqual(w.text.items.map((i) => i.type), ['text', 'link', 'text']);
+  const back = fromOzon(toOzon([b])).blocks[0];
+  assert.equal(back.text, b.text);
+  assert.equal(back.pad, 'type1'); assert.equal(back.gap, 's');
+});
+
+test('карточки со значком и плитки по 4', () => {
+  const c = newBlock('cards');
+  const w = toOzon([c]).content[0];
+  assert.equal(w.type, 'tileSecondary');
+  assert.equal(w.blocks.length, 4);
+  assert.equal(fromOzon(toOzon([c])).blocks[0].type, 'cards');
+  const t = newBlock('tiles'); t.layout = '4';
+  t.items.push({ ...t.items[0] });
+  assert.equal(toOzon([t]).content[0].type, 'tileM');
+  const back = fromOzon(toOzon([t])).blocks[0];
+  assert.equal(back.layout, '4'); assert.equal(back.items.length, 4);
+});

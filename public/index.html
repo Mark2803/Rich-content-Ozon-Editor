@@ -23,13 +23,14 @@
   <div class="proj">
     <label class="sr" for="proj-name">Название шаблона</label>
     <input id="proj-name" placeholder="Название шаблона">
-    <select id="open" aria-label="Открыть шаблон"></select>
+    <button id="library" class="ghost" title="Все сохранённые шаблоны">📚 Библиотека</button>
   </div>
   <div class="acts">
     <div class="seg" role="group" aria-label="Вид">
       <button id="v-pc" aria-pressed="true">Компьютер</button>
       <button id="v-m" aria-pressed="false">Телефон</button>
     </div>
+    <button id="link" class="ghost" title="Ссылка на страницу Ozon внутри текста — туда, где курсор">🔗 Ссылка</button>
     <button id="emoji" class="ghost" title="Эмодзи и символы — вставляются туда, где курсор">😊 Эмодзи</button>
     <button id="undo" class="ghost" title="Отменить (Ctrl+Z)">Отменить</button>
     <button id="import" class="ghost">Импорт JSON</button>
@@ -71,6 +72,24 @@
       <button id="dlg-ok" class="blue" value="ok"></button>
     </div>
   </form>
+</dialog>
+<dialog id="lib" class="lib" aria-label="Библиотека шаблонов">
+  <div class="lib-head"><h2>Библиотека шаблонов</h2><button type="button" class="icon ghost" data-lib="close" aria-label="Закрыть">×</button></div>
+  <div class="lib-body">
+    <div class="lib-side">
+      <input id="lib-q" type="search" placeholder="Поиск по названию" aria-label="Поиск по названию">
+      <div id="lib-list"></div>
+      <div class="lib-save"><label for="lib-new">Сохранить то, что сейчас в редакторе, как новый шаблон</label>
+        <div class="add-row"><input id="lib-new" placeholder="Например: Шу пуэр 8 г — зима"><button type="button" class="blue" data-lib="savenew">Сохранить</button></div></div>
+    </div>
+    <div class="lib-main">
+      <div id="lib-acts" class="lib-acts" hidden>
+        <div><b id="lib-name"></b><small id="lib-meta"></small></div>
+        <span><button type="button" class="blue" data-lib="open">Открыть</button><button type="button" class="ghost" data-lib="copy">Копия</button><button type="button" class="ghost" id="lib-ren" data-lib="ren">Переименовать</button><button type="button" class="ghost danger" id="lib-del" data-lib="del">Удалить</button></span>
+      </div>
+      <div id="lib-pv" class="lib-pv"></div>
+    </div>
+  </div>
 </dialog>
 <div id="emo" class="emo-pop" hidden role="dialog" aria-label="Эмодзи и символы">
   <div class="emo-head"><div class="seg"><button type="button" id="emo-t-e" aria-pressed="true">Эмодзи</button><button type="button" id="emo-t-s" aria-pressed="false">Символы</button></div><button type="button" class="icon ghost" id="emo-x" aria-label="Закрыть">×</button></div>

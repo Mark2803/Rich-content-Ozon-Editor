@@ -136,7 +136,7 @@ async function listTemplates() {
   const names = (await readdir(TPL)).filter((n) => n.endsWith('.json'));
   const items = [];
   for (const n of names) {
-    try { const t = JSON.parse(await readFile(path.join(TPL, n), 'utf8')); items.push({ id: decodeURIComponent(n.slice(0, -5)), name: t.name, updatedAt: t.updatedAt }); } catch { /* пропускаем битый файл */ }
+    try { const t = JSON.parse(await readFile(path.join(TPL, n), 'utf8')); items.push({ id: decodeURIComponent(n.slice(0, -5)), name: t.name, updatedAt: t.updatedAt, count: Array.isArray(t.blocks) ? t.blocks.length : 0 }); } catch { /* пропускаем битый файл */ }
   }
   return items.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 }
