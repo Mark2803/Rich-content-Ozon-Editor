@@ -701,7 +701,9 @@ function importJson() {
 let lastField = null; let lastRange = null;
 document.addEventListener('focusin', (e) => {
   const t = e.target;
-  if (t.matches('#insp input:not([type=checkbox]), #insp textarea, #pv [contenteditable], #proj-name')) lastField = t;
+  if (t.matches('#insp input:not([type=checkbox]):not([type=color]), #insp textarea, #pv [contenteditable], #proj-name')) lastField = t;
+  // Поле значка свойства/ноты: сразу открываем эмодзи — выбранный значок заменит прежний.
+  if (t.matches('#insp input.ico') && $('emo').hidden) { $('emo').hidden = false; renderPicker('emo'); }
 });
 document.addEventListener('selectionchange', () => {
   const s = window.getSelection();
@@ -715,6 +717,10 @@ function insertSymbol(ch) {
     const sel2 = window.getSelection();
     if (lastRange && el.contains(lastRange.startContainer)) { sel2.removeAllRanges(); sel2.addRange(lastRange); }
     document.execCommand('insertText', false, ch);
+  } else if (el.classList.contains('ico')) {
+    el.value = ch; el.focus(); el.select();
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
   } else {
     const a = el.selectionStart ?? el.value.length; const z = el.selectionEnd ?? a;
     el.value = el.value.slice(0, a) + ch + el.value.slice(z);
