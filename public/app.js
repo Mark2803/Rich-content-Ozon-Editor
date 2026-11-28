@@ -91,6 +91,7 @@ function renderList() {
     <li data-id="${b.id}" class="${b.id === sel ? 'on' : ''}" tabindex="0" draggable="true" title="Перетащите, чтобы поменять порядок">
       <span class="grip" aria-hidden="true">⋮⋮</span><span class="nm">${esc(TYPES[b.type])}<small>${esc(blockCaption(b)) || '&nbsp;'}</small></span>
       ${blockProblems(b).length ? '<span class="bad" title="Есть замечания"></span>' : ''}
+      <button type="button" class="li-del" data-del="${b.id}" title="Удалить блок" aria-label="Удалить блок «${esc(TYPES[b.type])}»">×</button>
     </li>`).join('');
 }
 
@@ -628,8 +629,22 @@ $('add').onclick = () => {
   state.blocks.splice(n < 0 ? state.blocks.length : n + 1, 0, b);
   sel = b.id; saveDraft(); render(); select(b.id, true);
 };
-$('list').addEventListener('click', (e) => { const li = e.target.closest('li'); if (li) select(li.dataset.id, true); });
-$('list').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const li = e.target.closest('li'); if (li) select(li.dataset.id, true); } });
+// Удаление блока кнопкой × прямо в списке; вернуть — «Отменить».
+function deleteBlock(id) {
+  const n = state.blocks.findIndex((b) => b.id === id);
+  if (n < 0) return;
+  remember(true);
+  const [b] = state.blocks.splice(n, 1);
+  if (sel === id) sel = state.blocks[Math.min(n, state.blocks.length - 1)]?.id || '';
+  saveDraft(); render();
+  toast(`Блок «${TYPES[b.type]}» удалён. Вернуть — кнопка «Отменить» или Ctrl+Z`);
+}
+$('list').addEventListener('click', (e) => {
+  const del = e.target.closest('button[data-del]');
+  if (del) { e.stopPropagation(); deleteBlock(del.dataset.del); return; }
+  const li = e.target.closest('li'); if (li) select(li.dataset.id, true);
+});
+$('list').addEventListener('keydown', (e) => { if (e.key === 'Delete' && e.target.matches('li')) { deleteBlock(e.target.dataset.id); return; } if (e.key === 'Enter' && !e.target.closest('button')) { const li = e.target.closest('li'); if (li) select(li.dataset.id, true); } });
 $('pv').addEventListener('click', (e) => { const w = e.target.closest('.w'); if (w && w.dataset.id !== sel) select(w.dataset.id); });
 $('pv').addEventListener('input', onPreviewEdit);
 // Битая ссылка на картинку: показываем заметную плашку вместо пустого места.

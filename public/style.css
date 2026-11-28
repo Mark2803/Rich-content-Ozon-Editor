@@ -213,3 +213,9 @@ dialog.lib[open]{display:flex;flex-direction:column}
 .lib-pv .frame.mini.m{zoom:.85}
 .lib-empty{padding:40px;text-align:center}
 @media (max-width:760px){.lib-body{grid-template-columns:1fr}.lib-main{display:none}}
+
+/* Кнопка «Удалить» в списке блоков */
+#list li .li-del{flex:none;width:28px;height:28px;min-height:28px;padding:0;border-radius:8px;background:transparent;color:var(--mute);font-size:18px;line-height:1;border:0;opacity:.55}
+#list li:hover .li-del,#list li.on .li-del,#list li .li-del:focus-visible{opacity:1}
+#list li .li-del:hover{background:#ffe3e6;color:var(--err)}
+@media (hover:none){#list li .li-del{opacity:1}}
