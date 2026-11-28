@@ -703,7 +703,7 @@ document.addEventListener('focusin', (e) => {
   const t = e.target;
   if (t.matches('#insp input:not([type=checkbox]):not([type=color]), #insp textarea, #pv [contenteditable], #proj-name')) lastField = t;
   // Поле значка свойства/ноты: сразу открываем эмодзи — выбранный значок заменит прежний.
-  if (t.matches('#insp input.ico') && $('emo').hidden) { $('emo').hidden = false; renderPicker('emo'); }
+  if (t.matches('#insp input.ico')) openPickerFor(t);
 });
 document.addEventListener('selectionchange', () => {
   const s = window.getSelection();
@@ -728,6 +728,13 @@ function insertSymbol(ch) {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 }
+// Открыть эмодзи для поля значка (и при повторном нажатии, если окно закрыли).
+function openPickerFor(el) {
+  lastField = el;
+  if ($('emo').hidden) { $('emo').hidden = false; renderPicker('emo'); }
+}
+document.addEventListener('click', (e) => { const t = e.target.closest && e.target.closest('#insp input.ico'); if (t) openPickerFor(t); });
+
 function renderPicker(tab) {
   const groups = tab === 'sym' ? SYMBOLS : EMOJI;
   $('emo-body').innerHTML = groups.map((g) => `<div class="emo-g"><b>${esc(g.name)}</b><div>${g.items.map((c) => `<button type="button" class="emo" data-ch="${esc(c)}" title="${esc(c)}">${esc(c)}</button>`).join('')}</div></div>`).join('');
