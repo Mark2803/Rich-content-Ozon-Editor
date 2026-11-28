@@ -229,11 +229,12 @@ function picSteps(b) {
   const P = paletteOf(b);
   const own = b.own || {};
   const hasOwn = Boolean(own.bg || own.card || own.ink) || ['teas', 'props', 'sliders', 'segs', 'points', 'notes', 'rows'].some((k) => (b[k] || []).some((x) => x && x.color));
-  return `<label>Цвета картинки — ${Object.keys(PALETTES).length} готовых наборов</label><div class="pals">${Object.entries(PALETTES).map(([k, p]) => `<button type="button" class="pal ${pal === k ? 'on' : ''}" data-act="palette" data-v="${k}" title="${esc(p.name)}"><span style="background:${p.bg}"></span>${p.many.slice(0, 5).map((c) => `<span style="background:${c}"></span>`).join('')}<small>${esc(p.name)}</small></button>`).join('')}</div>
+  const cur = PALETTES[pal] || PALETTES.shu;
+  return `<details class="grp colors"><summary><b>Цвета картинки:</b> ${esc(cur.name)} <span class="mini">${cur.many.slice(0, 5).map((c) => `<i style="background:${c}"></i>`).join('')}</span> <u>сменить</u></summary><p class="note">${Object.keys(PALETTES).length} готовых наборов по 12 цветов.</p><div class="pals">${Object.entries(PALETTES).map(([k, p]) => `<button type="button" class="pal ${pal === k ? 'on' : ''}" data-act="palette" data-v="${k}" title="${esc(p.name)}"><span style="background:${p.bg}"></span>${p.many.slice(0, 5).map((c) => `<span style="background:${c}"></span>`).join('')}<small>${esc(p.name)}</small></button>`).join('')}</div>
       <details class="grp own" ${hasOwn ? 'open' : ''}><summary><b>Свои цвета</b> — фон, карточка, текст</summary>
         <div class="owns">${[['bg', 'Фон'], ['card', 'Карточка'], ['ink', 'Текст']].map(([k, t]) => `<label class="clrl"><input type="color" class="clr" data-f="own.${k}" value="${own[k] || P[k]}"> ${t}</label>`).join('')}</div>
         <p class="note">Цвет каждого свойства, ноты или точки меняется кружком рядом с ним.</p>
-        <button type="button" class="sm ghost" data-act="ownreset" ${hasOwn ? '' : 'disabled'}>Вернуть цвета набора</button></details>
+        <button type="button" class="sm ghost" data-act="ownreset" ${hasOwn ? '' : 'disabled'}>Вернуть цвета набора</button></details></details>
       <ol class="steps"><li>Скачайте картинки: <button type="button" class="sm blue" data-act="picdl" data-m="0">Для ПК, 1416 px</button> <button type="button" class="sm ghost" data-act="picdl" data-m="1">Для телефона, 640 px</button></li>
       <li>Загрузите их в конструктор rich-контента Ozon и скопируйте ссылки.</li><li>Вставьте ссылки сюда:</li></ol>
       ${imgFields('pic', 'pic', b.pic || emptyImage())}
@@ -252,7 +253,7 @@ function chartEditor(b) {
   const k = b.kind || 'bars';
   const teaNames = b.teas.map((t, i) => t.name || `Чай ${i + 1}`);
   const usesTeas = ['bars', 'radar', 'sliders'].includes(k);
-  let html = `<div class="grp look-grp"><b>Вид схемы</b><div class="seg look kinds" role="group" aria-label="Вид схемы">${Object.entries(CHART_KINDS).map(([v, t]) => `<button type="button" data-act="ckind" data-v="${v}" aria-pressed="${k === v}">${t.name}</button>`).join('')}</div>
+  let html = `<div class="grp look-grp"><p class="lead">Редактор инфографики: выберите вид схемы и впишите значения — картинка в центре меняется сразу.</p><b>Вид схемы</b><div class="seg look kinds" role="group" aria-label="Вид схемы">${Object.entries(CHART_KINDS).map(([v, t]) => `<button type="button" data-act="ckind" data-v="${v}" aria-pressed="${k === v}">${t.name}</button>`).join('')}</div>
     <p class="note">${esc(CHART_KINDS[k].hint)}</p></div>${fld('title', 'Заголовок на картинке', b.title)}`;
   if (usesTeas) {
     html += b.teas.length === 1
@@ -482,8 +483,11 @@ function onPreviewEdit(e) {
 }
 
 function select(id, scroll) {
+  const changed = sel !== id;
   sel = id;
   renderList(); renderInspector();
+  // Настройки нового блока показываем с начала, а не с того места, где была прокрутка.
+  if (changed) document.querySelector('.panel.insp')?.scrollTo({ top: 0 });
   document.querySelectorAll('#pv .w').forEach((w) => w.classList.toggle('on', w.dataset.id === id));
   if (scroll) document.querySelector(`#pv .w[data-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
