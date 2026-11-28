@@ -427,17 +427,17 @@ export function chartPicture(b, mobile = false) {
 
 export const pictureOf = (b, mobile) => (b.type === 'chart' ? chartPicture(b, mobile) : b.type === 'taste' ? tastePicture(b, mobile) : tablePicture(b, mobile));
 
-// Скачать картинку файлом PNG.
+// Скачать картинку файлом JPG (самый привычный для Ozon формат; фон у картинок сплошной, прозрачность не нужна).
 export function downloadPicture(b, mobile) {
   const c = pictureOf(b, mobile);
-  const name = `${(b.title || (b.type === 'taste' ? 'profil-vkusa' : 'tablica')).toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-|-$/g, '') || 'kartinka'}-${mobile ? 'telefon-640' : 'pk-1416'}.png`;
+  const name = `${(b.title || (b.type === 'taste' ? 'profil-vkusa' : 'tablica')).toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-|-$/g, '') || 'kartinka'}-${mobile ? 'telefon-640' : 'pk-1416'}.jpg`;
   return new Promise((ok) => c.toBlob((blob) => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     ok({ name, w: c.width, h: c.height });
-  }, 'image/png'));
+  }, 'image/jpeg', 0.92));
 }
 
 export { scale };
