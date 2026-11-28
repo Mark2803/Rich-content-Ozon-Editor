@@ -20,7 +20,7 @@ test('шаблоны собираются в JSON Ozon нужного вида',
     const json = toOzon(PRESETS[key].blocks());
     assert.equal(json.version, 0.3);
     const kinds = json.content.map((w) => w.widgetName + ':' + (w.type || w.theme));
-    assert.deepEqual(kinds, ['raShowcase:billboard', 'raShowcase:chess', 'raTextBlock:primary', 'raShowcase:tileL', 'raTextBlock:secondary', 'raShowcase:tileL', 'raTextBlock:primary', 'list:image', 'list:bullet', 'raShowcase:roll']);
+    assert.deepEqual(kinds, ['raShowcase:billboard', 'raShowcase:chess', 'raTextBlock:primary', 'raShowcase:tileL', 'raTextBlock:secondary', 'raShowcase:tileXL', 'raTextBlock:primary', 'list:image', 'list:bullet', 'raShowcase:roll']);
     const chess = json.content[1].blocks;
     assert.deepEqual(chess.map((b) => b.reverse), [false, true, false], 'шахматка чередуется');
     for (const w of json.content) for (const b of w.blocks || []) if (b.img) {
@@ -121,4 +121,30 @@ test('новые блоки: нумерованный список, таблиц
   const back = fromOzon(toOzon([num, table, v])).blocks;
   assert.deepEqual(back.map((b) => b.type), ['numlist', 'table', 'video']);
   assert.deepEqual(back[1].rows[1], ['25 г', '50', '50']);
+});
+
+test('плитки: любое количество, ровные ряды', async () => {
+  const { tileRows } = await import('../public/rich.js');
+  const sig = (n, l) => tileRows(n, l).map((r) => `${r.type}${r.count}`).join('+');
+  assert.equal(sig(3), 'tileL3');
+  assert.equal(sig(4), 'tileXL4', '4 — два ряда по 2');
+  assert.equal(sig(5), 'tileL3+tileXL2', '5 — 3 сверху, 2 снизу по центру');
+  assert.equal(sig(6), 'tileL6', '6 — 3 под 3');
+  assert.equal(sig(7), 'tileL3+tileXL4');
+  assert.equal(sig(8), 'tileL6+tileXL2');
+  assert.equal(sig(5, '3'), 'tileL5');
+  assert.equal(sig(5, '2'), 'tileXL5');
+  const b = newBlock('tiles');
+  b.items = [1, 2, 3, 4, 5].map((n) => ({ title: `Чай ${n}`, text: '', sku: '5211050462', img: { src: '', srcM: '', w: 0, h: 0, wM: 0, hM: 0 } }));
+  const json = toOzon([b]);
+  assert.deepEqual(json.content.map((w) => `${w.type}:${w.blocks.length}`), ['tileL:3', 'tileXL:2']);
+  assert.deepEqual(check([b]).filter((p) => p.includes('плит')), [], 'больше 3 плиток — не ошибка');
+  // импорт обратно — снова один блок из 5 плиток
+  const back = fromOzon(json).blocks;
+  assert.equal(back.length, 1);
+  assert.equal(back[0].items.length, 5);
+  assert.equal(back[0].layout, 'auto');
+  // два отдельных ряда по 3, сделанных вручную, не склеиваются
+  const two = { version: 0.3, content: [json.content[0], { ...json.content[0] }] };
+  assert.equal(fromOzon(two).blocks.length, 2);
 });

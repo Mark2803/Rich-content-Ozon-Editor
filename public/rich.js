@@ -69,7 +69,7 @@ export function newBlock(type) {
   switch (type) {
     case 'hero': return { id: uid(), type, title: 'Заголовок', text: 'Короткий текст под заголовком.', img: img() };
     case 'chess': return { id: uid(), type, items: [1, 2].map(() => ({ title: 'Заголовок', text: 'Текст до 260 знаков: на телефоне он идёт под картинкой.', img: img() })) };
-    case 'tiles': return { id: uid(), type, items: [1, 2, 3].map(() => ({ title: 'Название', text: 'Подпись', sku: '', img: img() })) };
+    case 'tiles': return { id: uid(), type, layout: 'auto', items: [1, 2, 3].map(() => ({ title: 'Название', text: 'Подпись', sku: '', img: img() })) };
     case 'roll': return { id: uid(), type, items: [{ sku: '', link: '', img: img() }] };
     case 'text': return { id: uid(), type, title: 'Заголовок раздела', text: '', theme: 'primary', linkLabel: '', linkUrl: '' };
     case 'faq': return { id: uid(), type, items: [{ q: 'Вопрос', a: 'Ответ.' }] };
@@ -132,6 +132,22 @@ function imgShowcase(type, img, alt, position) {
   };
 }
 
+// Раскладка плиток. Проверено в песочнице Ozon 28.11.2026: tileL ставит по 3 в ряд,
+// лишние уходят на следующий ряд и прижимаются влево (по центру Ozon не ставит);
+// tileXL — по 2 в ряд, каждая на половину ширины. На телефоне любые плитки идут по одной в ряд.
+// «Авто»: 4 → 2+2, 5 → 3+2, 6 → 3+3, 7 → 3+2+2; неполный ряд из двух делаем крупными
+// плитками на всю ширину, чтобы он стоял ровно по центру, а не прижимался влево.
+export const TILE_LAYOUTS = { auto: 'Авто: ровные ряды', 3: 'Все по 3 в ряд', 2: 'Все по 2 в ряд, крупные' };
+export function tileRows(n, layout = 'auto') {
+  if (n <= 0) return [];
+  if (layout === '3' || layout === 3) return [{ type: 'tileL', count: n }];
+  if (layout === '2' || layout === 2) return [{ type: 'tileXL', count: n }];
+  if (n === 2 || n === 4) return [{ type: 'tileXL', count: n }];
+  if (n % 3 === 0 || n === 1) return [{ type: 'tileL', count: n }];
+  if (n % 3 === 2) return [{ type: 'tileL', count: n - 2 }, { type: 'tileXL', count: 2 }];
+  return [{ type: 'tileL', count: n - 4 }, { type: 'tileXL', count: 4 }];
+}
+
 export function toOzon(blocks) {
   const content = [];
   for (const b of blocks) {
@@ -152,7 +168,7 @@ export function toOzon(blocks) {
         text: textObj(it.text, getStyle(b, 'text')),
       })) });
     } else if (b.type === 'tiles') {
-      content.push({ widgetName: 'raShowcase', type: 'tileL', blocks: b.items.map((it) => {
+      const tile = (it) => {
         const href = productUrl(it.sku);
         return {
           img: imgShowcase('tiles', it.img, it.title, 'to_the_edge'),
@@ -160,7 +176,13 @@ export function toOzon(blocks) {
           title: textObj(it.title, getStyle(b, 'title'), href),
           text: textObj(it.text, getStyle(b, 'text')),
         };
-      }) });
+      };
+      // Плитки раскладываются на ряды: tileL — по 3 в ряд, tileXL — по 2 (крупнее).
+      let from = 0;
+      for (const row of tileRows(b.items.length, b.layout)) {
+        content.push({ widgetName: 'raShowcase', type: row.type, blocks: b.items.slice(from, from + row.count).map(tile) });
+        from += row.count;
+      }
     } else if (b.type === 'roll') {
       content.push({ widgetName: 'raShowcase', type: 'roll', blocks: b.items.map((it) => ({
         img: imgShowcase('roll', it.img, it.alt || '', 'width_full'),
@@ -240,7 +262,19 @@ export function fromOzon(json) {
       if (last && last.type === 'chess' && last._merge) last.items.push(...items);
       else out.push({ id: uid(), type: 'chess', items, _merge: true, style: styleOf(bl[0]) });
     } else if (w.widgetName === 'raShowcase' && ['tileL', 'tileXL', 'tileM', 'tileSecondary'].includes(w.type)) {
-      out.push({ id: uid(), type: 'tiles', style: styleOf(bl[0]), items: bl.map((x) => ({ title: readText(x.title), text: readText(x.text), sku: skuFromUrl(x.imgLink || readLink(x.title)), img: readImg(x.img) })) });
+      const items = bl.map((x) => ({ title: readText(x.title), text: readText(x.text), sku: skuFromUrl(x.imgLink || readLink(x.title)), img: readImg(x.img) }));
+      const kind = w.type === 'tileXL' ? 'tileXL' : 'tileL';
+      const same = (rows, n) => JSON.stringify(rows) === JSON.stringify(tileRows(n, 'auto'));
+      const last = out[out.length - 1];
+      // Ряды, которые редактор сам разложил («Авто»), при импорте снова собираем в один блок.
+      const rows = last && last.type === 'tiles' && last._rows ? [...last._rows, { type: kind, count: items.length }] : null;
+      if (rows && same(rows, last.items.length + items.length)) {
+        last.items.push(...items); last._rows = rows; last.layout = 'auto';
+      } else {
+        const one = [{ type: kind, count: items.length }];
+        out.push({ id: uid(), type: 'tiles', style: styleOf(bl[0]), items, _rows: one,
+          layout: same(one, items.length) ? 'auto' : (kind === 'tileXL' ? '2' : '3') });
+      }
     } else if (w.widgetName === 'raShowcase' && w.type === 'roll') {
       const items = bl.map((x) => ({ sku: skuFromUrl(x.imgLink), link: skuFromUrl(x.imgLink) ? '' : x.imgLink || '', alt: (x.img || {}).alt || '', img: readImg(x.img) }));
       const last = out[out.length - 1];
@@ -269,7 +303,7 @@ export function fromOzon(json) {
       skipped.push(w.widgetName + (w.type ? `:${w.type}` : ''));
     }
   }
-  out.forEach((b) => delete b._merge);
+  out.forEach((b) => { delete b._merge; delete b._rows; });
   return { blocks: out, skipped };
 }
 
@@ -287,7 +321,6 @@ export function check(blocks) {
     list.forEach((img) => { const r = resolveImage(b.type, img); imgs.push([where, r.src], [where, r.srcM]); });
     if (b.type === 'chess' && (b.items.length < 2 || b.items.length > 6)) problems.push(`${where}: нужно от 2 до 6 блоков, сейчас ${b.items.length}`);
     if (b.type === 'chess') b.items.forEach((it, i) => { if ((it.text || '').length > 260) problems.push(`${where}, блок ${i + 1}: текст длиннее 260 знаков, на телефоне это простыня`); });
-    if (b.type === 'tiles' && b.items.length > 3) problems.push(`${where}: в ряд помещается не больше 3 плиток`);
     if (['tiles', 'catalog'].includes(b.type)) b.items.forEach((it) => { if (!productUrl(it.sku)) noSku.push(it.title || 'без названия'); });
     if (b.type === 'roll') b.items.forEach((it, i) => { if (it.link && !isOzonUrl(it.link)) problems.push(`${where}, картинка ${i + 1}: ссылка ведёт не на ozon.ru, Ozon такие запрещает`); });
     if (b.type === 'text' && (b.linkLabel || b.linkUrl) && !(b.linkLabel && isOzonUrl(b.linkUrl))) problems.push(`${where}: у кнопки-ссылки нужны и подпись, и адрес на ozon.ru`);

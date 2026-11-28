@@ -1,7 +1,7 @@
 // Редактор rich-контента Ozon: интерфейс.
 // Один набор блоков рисуется и для ПК, и для телефона, поэтому правка в одном виде
 // сразу видна в другом. Картинка для телефона подставляется из ПК, если своей нет.
-import { DEFAULT_SIZE, TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
+import { DEFAULT_SIZE, TILE_LAYOUTS, tileRows, TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
 import { EMOJI, SYMBOLS } from './emoji.js';
 import { PRESETS } from './presets.js';
 
@@ -118,7 +118,16 @@ function renderPreview() {
     let inner = '';
     if (b.type === 'hero') inner = `${imgHtml('hero', b.img, 'Обложка')}<div class="pad c">${ed(b, 'title', b.title, 's5')}${ed(b, 'text', b.text, 's3')}</div>`;
     if (b.type === 'chess') inner = b.items.map((it, i) => `<div class="chess ${i % 2 ? 'rev' : ''}"><div class="im">${imgHtml('chess', it.img, it.title)}</div><div class="tx">${ed(b, `items.${i}.title`, it.title, 's4')}${ed(b, `items.${i}.text`, it.text, 's3')}</div></div>`).join('');
-    if (b.type === 'tiles') inner = `<div class="tiles" style="--n:${Math.min(3, b.items.length) || 1}">${b.items.map((it, i) => `<div>${imgHtml('tiles', it.img, it.title)}${ed(b, `items.${i}.title`, it.title, 's4 c')}${ed(b, `items.${i}.text`, it.text, 's3 c')}</div>`).join('')}</div>`;
+    if (b.type === 'tiles') {
+      // Ряды как у Ozon: tileL — сетка на 3, tileXL — на 2; на телефоне по одной.
+      let from = 0;
+      inner = tileRows(b.items.length, b.layout).map((row) => {
+        const part = b.items.slice(from, from + row.count).map((it, k) => { const i = from + k;
+          return `<div>${imgHtml('tiles', it.img, it.title)}${ed(b, `items.${i}.title`, it.title, 's4 c')}${ed(b, `items.${i}.text`, it.text, 's3 c')}</div>`; }).join('');
+        from += row.count;
+        return `<div class="tiles" style="--n:${row.type === 'tileXL' ? 2 : 3}">${part}</div>`;
+      }).join('');
+    }
     if (b.type === 'roll') inner = b.items.map((it) => imgHtml('roll', it.img, it.alt || 'Картинка во всю ширину')).join('');
     if (b.type === 'text') inner = `<div class="tb" style="background:${(THEMES[b.theme] || THEMES.default).bg}">${ed(b, 'title', b.title, 's5')}${ed(b, 'text', b.text, 's3')}${b.linkLabel ? `<div class="lnkbtn" style="text-align:${getStyle(b, 'text').align}"><span>${esc(b.linkLabel)}</span></div>` : ''}</div>`;
     if (b.type === 'faq') inner = b.items.map((it, i) => `<div class="faq">${ed(b, `items.${i}.q`, it.q, 's4')}${ed(b, `items.${i}.a`, it.a, 's3')}</div>`).join('');
@@ -179,7 +188,8 @@ function styleControls(b) {
 function tableEditor(b) {
   const head = b.head.map((h, i) => `<div class="cell"><input data-f="head.${i}" value="${esc(h)}" aria-label="Столбец ${i + 1}"><button type="button" class="icon ghost danger" data-act="tcoldel" data-i="${i}" aria-label="Удалить столбец" ${b.head.length < 2 ? 'disabled' : ''}>×</button></div>`).join('');
   const rows = b.rows.map((r, ri) => `<div class="trow">${b.head.map((_, ci) => `<input data-f="rows.${ri}.${ci}" value="${esc(r[ci] ?? '')}" aria-label="Строка ${ri + 1}, столбец ${ci + 1}">`).join('')}<button type="button" class="icon ghost danger" data-act="trowdel" data-i="${ri}" aria-label="Удалить строку">×</button></div>`).join('');
-  return `${fld('title', 'Заголовок таблицы', b.title)}<label>Столбцы</label><div class="thead">${head}</div>
+  const phone = b.head.length <= 2 ? 'на телефоне таблица помещается целиком' : (b.head.length === 3 ? 'на телефоне помещается на большинстве экранов, на узких — чуть листается вбок' : 'на телефоне таблица листается пальцем вбок');
+  return `${fld('title', 'Заголовок таблицы', b.title)}<p class="note">Столбцов: ${b.head.length} — ${phone}. Ozon делает каждый столбец не уже 120 px.</p><label>Столбцы</label><div class="thead">${head}</div>
     <label>Строки</label><div class="tbody" style="--cols:${b.head.length}">${rows}</div>
     <div class="blk-acts"><button type="button" class="sm ghost" data-act="trowadd">Добавить строку</button><button type="button" class="sm ghost" data-act="tcoladd">Добавить столбец</button></div>`;
 }
@@ -220,6 +230,12 @@ function renderInspector() {
     + `<label for="f-theme">Фон</label><select id="f-theme" data-f="theme">${Object.entries(THEMES).map(([v, t]) => `<option value="${v}" ${b.theme === v ? 'selected' : ''}>${t.name}</option>`).join('')}</select>` + linkEditor(b);
   if (b.type === 'table') html = tableEditor(b);
   if (b.type === 'video') html = videoEditor(b);
+  if (b.type === 'tiles') {
+    const rows = tileRows(b.items.length, b.layout || 'auto');
+    const scheme = rows.flatMap((r) => { const out = []; let left = r.count; const per = r.type === 'tileXL' ? 2 : 3; while (left > 0) { out.push(`${Math.min(per, left)}${r.type === 'tileXL' ? ' крупные' : ''}`); left -= per; } return out; }).join(' / ') || '—';
+    html += `<div class="grp"><label for="f-layout">Раскладка плиток</label><select id="f-layout" data-f="layout">${Object.entries(TILE_LAYOUTS).map(([v, t]) => `<option value="${v}" ${(b.layout || 'auto') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <p class="note">Ряды на компьютере: <b>${esc(scheme)}</b>. Ozon прижимает неполный ряд к левому краю, поэтому в «Авто» ряд из двух делается крупными плитками на всю ширину — он стоит ровно по центру. На телефоне плитки идут по одной.</p></div>`;
+  }
   if (b.items) {
     html += b.items.map((it, i) => `<div class="grp"><div class="gh"><b>${ITEM_NAMES[b.type]} ${i + 1}</b><span>
       <button class="icon ghost" data-act="iup" data-i="${i}" ${i ? '' : 'disabled'} aria-label="Выше">↑</button>
