@@ -17,6 +17,7 @@ export const TYPES = {
   table: 'Таблица',
   taste: 'Профиль вкуса',
   cards: 'Карточки со значком',
+  chart: 'Инфографика вкуса',
   video: 'Видео',
 };
 
@@ -48,6 +49,7 @@ export const DEFAULT_STYLE = {
   table: DS('size4', 'left', 'size3', 'left'),
   taste: DS('size4', 'left', 'size3', 'left'),
   cards: DS('size3', 'center', 'size2', 'center'),
+  chart: DS('size4', 'center', 'size3', 'center'),
   video: DS('size4', 'left', 'size3', 'left'),
 };
 export const getStyle = (b, which) => ({ ...DEFAULT_STYLE[b.type][which], ...((b.style || {})[which] || {}) });
@@ -71,6 +73,28 @@ export const MARKS = { brown: ['🟤', '⚪'], green: ['🟢', '⚪'], orange: [
 const ICONS = [[/креп|насыщ/i, '💪'], [/терп|вяж/i, '🍂'], [/слад|мёд|мед/i, '🍯'], [/бодр|энерг|тониз/i, '⚡'], [/спок|рассл|сон|вечер/i, '🌙'],
   [/аромат|цвет/i, '🌸'], [/фрукт|ягод/i, '🍑'], [/горч/i, '🌰'], [/кисл|цитрус/i, '🍋'], [/древ|земл/i, '🌳'], [/дым|копч/i, '🔥'], [/мягк|нежн/i, '☁️'], [/свеж|трав/i, '🌿'], [/шокол|какао/i, '🍫']];
 export const iconFor = (name) => (ICONS.find(([re]) => re.test(name || '')) || [null, '🍵'])[1];
+// Инфографика вкуса: 6 видов схем. Ozon рисовать схемы не умеет — редактор рисует картинку.
+export const CHART_KINDS = {
+  bars: { name: 'Полоски', hint: 'Свойства и оценки делениями. Понятно всем, хорошо для одного чая.' },
+  radar: { name: 'Радар', hint: 'Каждое свойство — луч из центра, у каждого чая своя цветная фигура. Лучше всего для сравнения 2–3 чаёв.' },
+  sliders: { name: 'Шкала «от — до»', hint: 'Точка на линии между противоположностями: «лёгкий — крепкий». Как на винных этикетках.' },
+  wheel: { name: 'Колесо ароматов', hint: 'Кольцо из нот аромата: чем больше доля, тем шире кусок.' },
+  map: { name: 'Карта вкуса', hint: 'Каждый чай — точка на двух осях. Хорошо для витрины всей линейки.' },
+  notes: { name: 'Ноты вкуса', hint: 'Цветные ярлыки: «мёд», «орех», «сухофрукты».' },
+};
+export const chartAlt = (b) => {
+  const t = b.title || 'Инфографика вкуса';
+  const teas = (b.teas || []).map((x) => x.name);
+  const per = (vals) => vals.map((v, i) => `${teas.length > 1 ? `${teas[i]} ` : ''}${v}`).join(', ');
+  let s = t;
+  if (b.kind === 'bars' || b.kind === 'radar') s += `: ${b.props.map((p) => `${p.name} ${per(p.vals)} из ${b.max}`).join('; ')}`;
+  if (b.kind === 'sliders') s += `: ${b.sliders.map((x) => `${x.left} — ${x.right}: ${per(x.vals)} из 10`).join('; ')}`;
+  if (b.kind === 'wheel') s += `: ${b.segs.map((x) => `${x.name} ${x.val}`).join(', ')}`;
+  if (b.kind === 'map') s += `: ${b.points.map((p) => `${p.name} — ${p.x < 5 ? b.axes.xl : b.axes.xr}, ${p.y < 5 ? b.axes.yb : b.axes.yt}`).join('; ')}`;
+  if (b.kind === 'notes') s += `: ${b.notes.map((n) => n.name).join(', ')}`;
+  return s.slice(0, 500);
+};
+
 export const LOOKS = { table: 'Таблицей', card: 'Плашкой на цветном фоне', image: 'Цветной картинкой' };
 
 // Подпись к картинке (alt): содержимое словами — для покупателей с экранным диктором.
@@ -105,6 +129,14 @@ export function newBlock(type) {
     case 'taste': return { id: uid(), type, title: 'Профиль вкуса', mark: 'brown', max: 5, look: 'table', theme: 'tertiary', palette: 'shu', pic: img(),
       teas: [{ name: '', img: img() }],
       rows: [['Крепость', 4], ['Терпкость', 2], ['Сладость', 3], ['Бодрость', 4]].map(([name, v]) => ({ name, icon: iconFor(name), vals: [v] })) };
+    case 'chart': return { id: uid(), type, kind: 'bars', title: 'Профиль вкуса', palette: 'shu', pic: img(), max: 5, center: 'Шу пуэр',
+      teas: [{ name: 'Шу пуэр' }],
+      props: [['Крепость', 4], ['Терпкость', 2], ['Сладость', 3], ['Бодрость', 4], ['Аромат', 3]].map(([name, v]) => ({ name, icon: iconFor(name), vals: [v] })),
+      sliders: [['Лёгкий', 'Крепкий', 8], ['Сладкий', 'Терпкий', 4], ['Бодрит', 'Успокаивает', 2]].map(([left, right, v]) => ({ left, right, vals: [v] })),
+      segs: [['Дерево', 4], ['Сухофрукты', 3], ['Мёд', 2], ['Орех', 2], ['Земля', 1]].map(([name, val]) => ({ name, val })),
+      axes: { xl: 'Мягкий', xr: 'Крепкий', yb: 'Успокаивает', yt: 'Бодрит' },
+      points: [['Шу пуэр', 8, 8], ['ГАБА', 3, 2]].map(([name, x, y]) => ({ name, x, y })),
+      notes: [['🌳', 'дерево'], ['🍇', 'сухофрукты'], ['🍯', 'мёд'], ['🌰', 'орех'], ['🍫', 'какао']].map(([icon, name]) => ({ icon, name })) };
     case 'cards': return { id: uid(), type, items: [['Бодрит', 'как чашка крепкого чая'], ['2 минуты', 'без чайника и сита'], ['Без сахара', '100% чай'], ['3 года', 'срок хранения']].map(([title, text]) => ({ title, text, sku: '', img: img() })) };
     case 'video': return { id: uid(), type, src: '', w: 1280, h: 720 };
     case 'catalog': return { id: uid(), type, items: [{ title: 'Название чая', sku: '', text: 'Одна строка о вкусе.', img: img() }] };
@@ -270,6 +302,8 @@ export function toOzon(blocks) {
         title: textObj(it.title, getStyle(b, 'title'), productUrl(it.sku)),
         text: textObj(it.text, getStyle(b, 'text')),
       })) });
+    } else if (b.type === 'chart') {
+      content.push({ widgetName: 'raShowcase', type: 'roll', blocks: [{ img: imgShowcase('pic', b.pic || {}, chartAlt(b), 'width_full'), imgLink: '' }] });
     } else if ((b.type === 'table' || b.type === 'taste') && b.look === 'image') {
       // Цветная картинка, которую нарисовал редактор и загрузили в Ozon.
       content.push({ widgetName: 'raShowcase', type: 'roll', blocks: [{ img: imgShowcase('pic', b.pic || {}, pictureAlt(b), 'width_full'), imgLink: '' }] });
@@ -452,7 +486,7 @@ export function check(blocks) {
     if (b.type === 'text' && (b.linkLabel || b.linkUrl) && !(b.linkLabel && isOzonUrl(b.linkUrl))) problems.push(`${where}: у кнопки-ссылки нужны и подпись, и адрес на ozon.ru`);
     if (b.type === 'table' && (!b.head.length || !b.rows.length)) problems.push(`${where}: в таблице нужны столбцы и хотя бы одна строка`);
     if (b.type === 'table' && !b.hideHead) (b.headImg || []).forEach((im) => { if (im && (im.src || im.srcM)) { const r = resolveImage('thead', im); imgs.push([where, r.src], [where, r.srcM]); } });
-    if ((b.type === 'taste' || b.type === 'table') && b.look === 'image') {
+    if (b.type === 'chart' || ((b.type === 'taste' || b.type === 'table') && b.look === 'image')) {
       const r = resolveImage('pic', b.pic || {});
       if (!r.src) problems.push(`${where}: скачайте цветную картинку, загрузите её в конструктор rich-контента Ozon и вставьте ссылку`);
       else imgs.push([where, r.src], [where, r.srcM]);

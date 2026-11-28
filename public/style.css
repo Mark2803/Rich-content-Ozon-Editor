@@ -234,3 +234,11 @@ dialog.lib[open]{display:flex;flex-direction:column}
 .trow .ico{text-align:center;padding:6px 2px}
 .pv .picnote{font-size:12px;color:var(--mute);text-align:center;padding:6px 12px 10px}
 .pv .w > img{display:block;width:100%;height:auto}
+
+/* Инфографика вкуса */
+.crow{display:grid;gap:6px;margin-bottom:6px;align-items:center}
+.crow input,.crow select{padding:6px 8px;font-size:14px;min-width:0}
+.crow .ico{text-align:center;padding:6px 2px}
+.kinds button{flex:1 1 30%}
+.inl{display:flex;align-items:center;gap:6px;font-size:13px;margin:0}
+.inl select{width:auto;padding:4px 8px}

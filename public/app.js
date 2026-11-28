@@ -1,7 +1,7 @@
 // Редактор rich-контента Ozon: интерфейс.
 // Один набор блоков рисуется и для ПК, и для телефона, поэтому правка в одном виде
 // сразу видна в другом. Картинка для телефона подставляется из ПК, если своей нет.
-import { DEFAULT_SIZE, TILE_LAYOUTS, tileRows, MARKS, scale, LINK_RE, emptyImage, iconFor, LOOKS, TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
+import { DEFAULT_SIZE, TILE_LAYOUTS, tileRows, MARKS, scale, LINK_RE, emptyImage, iconFor, LOOKS, CHART_KINDS, TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
 import { EMOJI, SYMBOLS } from './emoji.js';
 import { PALETTES, pictureOf, downloadPicture, fontsReady } from './picture.js';
 import { PRESETS } from './presets.js';
@@ -118,7 +118,8 @@ function picHtml(b) {
   const r = resolveImage('pic', b.pic || {});
   const src = view === 'm' ? r.srcM : r.src;
   if (src) return `<img src="${esc(src)}" alt="" referrerpolicy="no-referrer">`;
-  const key = JSON.stringify([b.type, b.title, b.head, b.rows, b.teas && b.teas.map((t) => t.name), b.max, b.palette, b.hideHead, view]);
+  const { id: _id, pic: _pic, style: _st, ...rest } = b;
+  const key = JSON.stringify([rest, view]);
   if (!picCache.has(key)) { if (picCache.size > 30) picCache.clear(); picCache.set(key, pictureOf(b, view === 'm').toDataURL('image/png')); }
   return `<img src="${picCache.get(key)}" alt=""><div class="picnote">Так будет выглядеть картинка. Скачайте её справа и загрузите в Ozon.</div>`;
 }
@@ -157,7 +158,7 @@ function blocksHtml(blocks) {
     if (b.type === 'text') inner = `<div class="tb ${b.pad === 'type1' ? 'p1' : ''} ${b.gap === 's' ? 'gs' : ''}" style="background:${(THEMES[b.theme] || THEMES.default).bg}">${ed(b, 'title', b.title, 's5')}${ed(b, 'text', b.text, 's3')}${b.linkLabel ? `<div class="lnkbtn" style="text-align:${getStyle(b, 'text').align}"><span>${esc(b.linkLabel)}</span></div>` : ''}</div>`;
     if (b.type === 'faq') inner = b.items.map((it, i) => `<div class="faq">${ed(b, `items.${i}.q`, it.q, 's4')}${ed(b, `items.${i}.a`, it.a, 's3')}</div>`).join('');
     if (b.type === 'numlist') inner = `<ol class="numl">${b.items.map((it, i) => `<li>${ed(b, `items.${i}.q`, it.q, 's4')}${ed(b, `items.${i}.a`, it.a, 's3')}</li>`).join('')}</ol>`;
-    if ((b.type === 'table' || b.type === 'taste') && b.look === 'image') inner = picHtml(b);
+    if (b.type === 'chart' || ((b.type === 'table' || b.type === 'taste') && b.look === 'image')) inner = picHtml(b);
     else if (b.type === 'taste' && b.look === 'card') {
       const multi = b.teas.length > 1;
       const lines = [];
@@ -218,15 +219,65 @@ function lookEditor(b) {
   let html = `<div class="grp look-grp"><b>Вид</b><div class="seg look" role="group" aria-label="Вид блока">${looks.map(([k, t]) => `<button type="button" data-act="look" data-v="${k}" aria-pressed="${(b.look || 'table') === k}">${t}</button>`).join('')}</div>`;
   if (b.look === 'card') html += `<label for="f-theme">Фон плашки</label><select id="f-theme" data-f="theme">${Object.entries(THEMES).filter(([k]) => k !== 'default').map(([v, t]) => `<option value="${v}" ${(b.theme || 'tertiary') === v ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
     <p class="note">Ozon даёт для фона только голубой, серый и белый. Цвет добавляют эмодзи-шкалы и значки свойств, текст на плашке крупнее.</p>`;
-  if (b.look === 'image') {
-    const pal = b.palette || 'shu';
-    html += `<label>Цвета картинки</label><div class="pals">${Object.entries(PALETTES).map(([k, p]) => `<button type="button" class="pal ${pal === k ? 'on' : ''}" data-act="palette" data-v="${k}" title="${esc(p.name)}"><span style="background:${p.bg}"></span><span style="background:${p.accents[0]}"></span><span style="background:${p.accents[1]}"></span><span style="background:${p.head}"></span><small>${esc(p.name)}</small></button>`).join('')}</div>
+  if (b.look === 'image') html += picSteps(b);
+  return `${html}</div>`;
+}
+
+// Цвета картинки, скачивание и ссылки — общие для всех блоков-картинок.
+function picSteps(b) {
+  const pal = b.palette || 'shu';
+  return `<label>Цвета картинки</label><div class="pals">${Object.entries(PALETTES).map(([k, p]) => `<button type="button" class="pal ${pal === k ? 'on' : ''}" data-act="palette" data-v="${k}" title="${esc(p.name)}"><span style="background:${p.bg}"></span><span style="background:${p.accents[0]}"></span><span style="background:${p.accents[1]}"></span><span style="background:${p.head}"></span><small>${esc(p.name)}</small></button>`).join('')}</div>
       <ol class="steps"><li>Скачайте картинки: <button type="button" class="sm blue" data-act="picdl" data-m="0">Для ПК, 1416 px</button> <button type="button" class="sm ghost" data-act="picdl" data-m="1">Для телефона, 640 px</button></li>
       <li>Загрузите их в конструктор rich-контента Ozon и скопируйте ссылки.</li><li>Вставьте ссылки сюда:</li></ol>
       ${imgFields('pic', 'pic', b.pic || emptyImage())}
-      <p class="note">Картинка — во всю ширину, в любых цветах и с вашим шрифтом. Минус: текст на картинке Ozon не читает при поиске, поэтому важные слова держите и в обычном тексте карточки. После правок в таблице скачайте и загрузите картинку заново.</p>`;
+      <p class="note">Картинка — во всю ширину, в любых цветах и с вашим шрифтом. Минус: текст на картинке Ozon не читает при поиске, поэтому важные слова держите и в обычном тексте карточки. После правок скачайте и загрузите картинку заново.</p>`;
+}
+
+// ---------- Инфографика вкуса ----------
+const numSel = (path, val, from, to, label) => `<select data-f="${path}" data-num="1" aria-label="${esc(label)}">${Array.from({ length: to - from + 1 }, (_, k) => from + k).map((v) => `<option value="${v}" ${Number(val) === v ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
+const inp = (path, val, label, cls = '') => `<input class="${cls}" data-f="${path}" value="${esc(val ?? '')}" aria-label="${esc(label)}" placeholder="${esc(label)}">`;
+const delBtn = (list, i, dis) => `<button type="button" class="icon ghost danger" data-act="cdel" data-list="${list}" data-i="${i}" aria-label="Удалить" ${dis ? 'disabled' : ''}>×</button>`;
+const row = (cols, inner) => `<div class="crow" style="grid-template-columns:${cols}">${inner}</div>`;
+const addBtn = (list, text, dis) => `<button type="button" class="sm ghost" data-act="cadd" data-list="${list}" ${dis ? 'disabled' : ''}>${text}</button>`;
+
+function chartEditor(b) {
+  const k = b.kind || 'bars';
+  const teaNames = b.teas.map((t, i) => t.name || `Чай ${i + 1}`);
+  const usesTeas = ['bars', 'radar', 'sliders'].includes(k);
+  let html = `<div class="grp look-grp"><b>Вид схемы</b><div class="seg look kinds" role="group" aria-label="Вид схемы">${Object.entries(CHART_KINDS).map(([v, t]) => `<button type="button" data-act="ckind" data-v="${v}" aria-pressed="${k === v}">${t.name}</button>`).join('')}</div>
+    <p class="note">${esc(CHART_KINDS[k].hint)}</p></div>${fld('title', 'Заголовок на картинке', b.title)}`;
+  if (usesTeas) {
+    html += `<label>${k === 'sliders' ? 'Чаи (у каждого — своя точка)' : 'Чаи (у каждого — свой цвет)'}</label>${b.teas.map((t, i) => row('1fr 32px', inp(`teas.${i}.name`, t.name, `Чай ${i + 1}`) + delBtn('teas', i, b.teas.length < 2))).join('')}
+      <div class="blk-acts">${addBtn('teas', 'Добавить чай для сравнения', b.teas.length >= 3)}</div>`;
   }
-  return `${html}</div>`;
+  if (k === 'bars' || k === 'radar') {
+    html += `<label>Свойства и оценки ${b.teas.length > 1 ? `(${teaNames.map(esc).join(' / ')})` : ''}</label>
+      ${b.props.map((p, i) => row(`44px minmax(0,1.4fr) repeat(${b.teas.length},minmax(0,1fr)) 32px`, inp(`props.${i}.icon`, p.icon, 'Значок', 'ico') + inp(`props.${i}.name`, p.name, 'Свойство') + b.teas.map((_, ti) => numSel(`props.${i}.vals.${ti}`, p.vals[ti], 0, b.max, `${p.name}: ${teaNames[ti]}`)).join('') + delBtn('props', i, b.props.length < (k === 'radar' ? 4 : 2)))).join('')}
+      <div class="blk-acts">${addBtn('props', 'Добавить свойство', b.props.length >= 10)}
+      <label class="inl">Шкала из <select data-f="max" data-num="1">${[5, 10].map((v) => `<option value="${v}" ${b.max === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label></div>
+      ${k === 'radar' ? '<p class="note">Для радара нужно от 3 свойств; красивее всего 5–6.</p>' : ''}`;
+  }
+  if (k === 'sliders') {
+    html += `<label>Шкалы: левый край, правый край и где стоит чай (0 — слева, 10 — справа)</label>
+      ${b.sliders.map((s, i) => row(`minmax(0,1fr) minmax(0,1fr) repeat(${b.teas.length},64px) 32px`, inp(`sliders.${i}.left`, s.left, 'Слева') + inp(`sliders.${i}.right`, s.right, 'Справа') + b.teas.map((_, ti) => numSel(`sliders.${i}.vals.${ti}`, s.vals[ti], 0, 10, `${teaNames[ti]}`)).join('') + delBtn('sliders', i, b.sliders.length < 2))).join('')}
+      <div class="blk-acts">${addBtn('sliders', 'Добавить шкалу', b.sliders.length >= 8)}</div>`;
+  }
+  if (k === 'wheel') {
+    html += `${fld('center', 'Надпись в центре кольца', b.center, { ph: 'Шу пуэр' })}<label>Ноты аромата и их доля (чем больше число, тем шире кусок)</label>
+      ${b.segs.map((s, i) => row('minmax(0,1fr) 72px 32px', inp(`segs.${i}.name`, s.name, 'Нота') + numSel(`segs.${i}.val`, s.val, 1, 10, `${s.name}: доля`) + delBtn('segs', i, b.segs.length < 2))).join('')}
+      <div class="blk-acts">${addBtn('segs', 'Добавить ноту', b.segs.length >= 8)}</div>`;
+  }
+  if (k === 'map') {
+    html += `<label>Оси карты</label>${row('1fr 1fr', inp('axes.xl', b.axes.xl, '← Слева') + inp('axes.xr', b.axes.xr, 'Справа →'))}${row('1fr 1fr', inp('axes.yb', b.axes.yb, '↓ Снизу') + inp('axes.yt', b.axes.yt, '↑ Сверху'))}
+      <label>Чаи на карте: по горизонтали (0 — «${esc(b.axes.xl)}», 10 — «${esc(b.axes.xr)}») и по вертикали (0 — «${esc(b.axes.yb)}», 10 — «${esc(b.axes.yt)}»)</label>
+      ${b.points.map((p, i) => row('minmax(0,1fr) 64px 64px 32px', inp(`points.${i}.name`, p.name, 'Чай') + numSel(`points.${i}.x`, p.x, 0, 10, `${p.name}: по горизонтали`) + numSel(`points.${i}.y`, p.y, 0, 10, `${p.name}: по вертикали`) + delBtn('points', i, b.points.length < 2))).join('')}
+      <div class="blk-acts">${addBtn('points', 'Добавить чай', b.points.length >= 12)}</div>`;
+  }
+  if (k === 'notes') {
+    html += `<label>Ноты вкуса: значок и слово</label>${b.notes.map((n, i) => row('44px minmax(0,1fr) 32px', inp(`notes.${i}.icon`, n.icon, 'Значок', 'ico') + inp(`notes.${i}.name`, n.name, 'Нота') + delBtn('notes', i, b.notes.length < 2))).join('')}
+      <div class="blk-acts">${addBtn('notes', 'Добавить ноту', b.notes.length >= 14)}</div>`;
+  }
+  return `${html}<div class="grp">${picSteps(b)}</div>`;
 }
 
 function tasteEditor(b) {
@@ -246,7 +297,7 @@ function tasteEditor(b) {
 
 // Оформление текста: только то, что разрешает Ozon — размер, цвет, выравнивание.
 function styleControls(b) {
-  if (['roll', 'video'].includes(b.type)) return '';
+  if (['roll', 'video', 'chart'].includes(b.type) || b.look === 'image') return '';
   const part = (which, label) => {
     const st = getStyle(b, which);
     const def = DEFAULT_STYLE[b.type][which];
@@ -311,6 +362,7 @@ function renderInspector() {
     <div class="row2"><div><label for="f-pad">Поля вокруг</label><select id="f-pad" data-f="pad"><option value="type2" ${b.pad !== 'type1' ? 'selected' : ''}>С полями</option><option value="type1" ${b.pad === 'type1' ? 'selected' : ''}>Без полей</option></select></div>
     <div><label for="f-gap">Между заголовком и текстом</label><select id="f-gap" data-f="gap"><option value="m" ${b.gap !== 's' ? 'selected' : ''}>Обычно</option><option value="s" ${b.gap === 's' ? 'selected' : ''}>Плотнее</option></select></div></div>` + linkEditor(b);
   if (b.type === 'taste') html = tasteEditor(b);
+  if (b.type === 'chart') html = chartEditor(b);
   if (b.type === 'table') html = tableEditor(b);
   if (b.type === 'video') html = videoEditor(b);
   if (b.type === 'tiles') {
@@ -386,10 +438,13 @@ function onField(e) {
   }
   // Новое название свойства — подбираем значок, если он был подобран автоматически.
   const nm = f.match(/^rows\.(\d+)\.name$/);
+  const pn = f.match(/^props\.(\d+)\.name$/);
+  if (pn && b.type === 'chart') { const p = b.props[Number(pn[1])]; if (!p.icon || p.icon === iconFor(p.name)) p.icon = iconFor(val); }
   if (nm && b.type === 'taste') { const row = b.rows[Number(nm[1])]; if (!row.icon || row.icon === iconFor(row.name)) row.icon = iconFor(val); }
   if (f.startsWith('pic.') && !b.pic) b.pic = emptyImage();
   setPath(b, f, val);
-  if (f === 'max') b.rows.forEach((r) => { r.vals = r.vals.map((v) => Math.min(v, val)); });
+  if (f === 'max' && b.type === 'chart') b.props.forEach((p) => { p.vals = p.vals.map((v) => Math.min(v, val)); });
+  else if (f === 'max') b.rows.forEach((r) => { r.vals = r.vals.map((v) => Math.min(v, val)); });
   if (/\.(src|srcM)$/.test(f)) {
     const base = f.replace(/\.(src|srcM)$/, '');
     const img = base.split('.').reduce((o, k) => o[k], b);
@@ -444,6 +499,23 @@ function onAction(e) {
     case 'tasterow': b.rows.push({ name: 'Свойство', icon: '🍵', vals: b.teas.map(() => 0) }); break;
     case 'look': b.look = btn.dataset.v; if (!b.pic) b.pic = emptyImage(); if (!b.palette) b.palette = 'shu'; break;
     case 'palette': b.palette = btn.dataset.v; break;
+    case 'ckind': b.kind = btn.dataset.v; break;
+    case 'cadd': {
+      const L = btn.dataset.list; const zeros = () => b.teas.map(() => 0);
+      if (L === 'teas') { b.teas.push({ name: `Чай ${b.teas.length + 1}` }); b.props.forEach((p) => p.vals.push(0)); b.sliders.forEach((s) => s.vals.push(5)); }
+      if (L === 'props') b.props.push({ name: 'Свойство', icon: '🍵', vals: zeros() });
+      if (L === 'sliders') b.sliders.push({ left: 'Слева', right: 'Справа', vals: b.teas.map(() => 5) });
+      if (L === 'segs') b.segs.push({ name: 'Нота', val: 1 });
+      if (L === 'points') b.points.push({ name: 'Чай', x: 5, y: 5 });
+      if (L === 'notes') b.notes.push({ icon: '🍵', name: 'нота' });
+      break;
+    }
+    case 'cdel': {
+      const L = btn.dataset.list;
+      b[L].splice(i, 1);
+      if (L === 'teas') { b.props.forEach((p) => p.vals.splice(i, 1)); b.sliders.forEach((s) => s.vals.splice(i, 1)); }
+      break;
+    }
     case 'picdl': fontsReady().then(() => downloadPicture(b, btn.dataset.m === '1')).then((f) => toast(`Скачано: ${f.name} (${f.w}×${f.h})`)); return;
     case 'tasteadd': b.teas.push({ name: `Чай ${b.teas.length + 1}`, img: emptyImage() }); b.rows.forEach((r) => r.vals.push(0)); break;
     case 'tteadel': b.teas.splice(i, 1); b.rows.forEach((r) => r.vals.splice(i, 1)); break;

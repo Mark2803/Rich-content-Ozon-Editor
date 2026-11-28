@@ -240,3 +240,16 @@ test('профиль вкуса и таблица: вид плашкой и цв
   const t = newBlock('table'); t.look = 'image'; t.pic = b.pic;
   assert.equal(toOzon([t]).content[0].type, 'roll');
 });
+
+test('инфографика вкуса: 6 видов, в Ozon уходит картинкой с описанием', async () => {
+  const { CHART_KINDS, chartAlt } = await import('../public/rich.js');
+  assert.deepEqual(Object.keys(CHART_KINDS), ['bars', 'radar', 'sliders', 'wheel', 'map', 'notes']);
+  const b = newBlock('chart');
+  assert.ok(check([b]).some((p) => p.includes('загрузите её')), 'пока нет ссылки — подсказка');
+  b.pic = { src: 'https://cdn1.ozone.ru/s3/rich/chart.png', srcM: '', w: 1416, h: 900, wM: 0, hM: 0 };
+  const w = toOzon([b]).content[0];
+  assert.equal(w.widgetName, 'raShowcase'); assert.equal(w.type, 'roll');
+  assert.match(w.blocks[0].img.alt, /Крепость 4 из 5/);
+  for (const k of Object.keys(CHART_KINDS)) { b.kind = k; assert.ok(chartAlt(b).length > 15, k); }
+  b.kind = 'map'; assert.match(chartAlt(b), /Шу пуэр — Крепкий, Бодрит/);
+});
