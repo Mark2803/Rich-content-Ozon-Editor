@@ -1,8 +1,9 @@
 // Редактор rich-контента Ozon: интерфейс.
 // Один набор блоков рисуется и для ПК, и для телефона, поэтому правка в одном виде
 // сразу видна в другом. Картинка для телефона подставляется из ПК, если своей нет.
-import { DEFAULT_SIZE, TILE_LAYOUTS, tileRows, MARKS, scale, LINK_RE, emptyImage, TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
+import { DEFAULT_SIZE, TILE_LAYOUTS, tileRows, MARKS, scale, LINK_RE, emptyImage, iconFor, LOOKS, TYPES, newBlock, toOzon, fromOzon, check, resolveImage, productUrl, SIZES, COLORS, THEMES, getStyle, DEFAULT_STYLE } from './rich.js';
 import { EMOJI, SYMBOLS } from './emoji.js';
+import { PALETTES, pictureOf, downloadPicture, fontsReady } from './picture.js';
 import { PRESETS } from './presets.js';
 
 const $ = (id) => document.getElementById(id);
@@ -111,6 +112,17 @@ function smallImg(img, label) {
   return src ? `<img class="hico" src="${esc(src)}" alt="${esc(label || '')}" referrerpolicy="no-referrer">` : '';
 }
 
+// Цветная картинка: пока ссылки нет — показываем ту, что нарисует редактор.
+const picCache = new Map();
+function picHtml(b) {
+  const r = resolveImage('pic', b.pic || {});
+  const src = view === 'm' ? r.srcM : r.src;
+  if (src) return `<img src="${esc(src)}" alt="" referrerpolicy="no-referrer">`;
+  const key = JSON.stringify([b.type, b.title, b.head, b.rows, b.teas && b.teas.map((t) => t.name), b.max, b.palette, b.hideHead, view]);
+  if (!picCache.has(key)) { if (picCache.size > 30) picCache.clear(); picCache.set(key, pictureOf(b, view === 'm').toDataURL('image/png')); }
+  return `<img src="${picCache.get(key)}" alt=""><div class="picnote">Так будет выглядеть картинка. Скачайте её справа и загрузите в Ozon.</div>`;
+}
+
 // Редактируемый текст прямо в предпросмотре.
 const ed = (b, path, val, cls) => {
   const which = /(^|\.)(title|q)$/.test(path) ? 'title' : 'text';
@@ -145,13 +157,22 @@ function blocksHtml(blocks) {
     if (b.type === 'text') inner = `<div class="tb ${b.pad === 'type1' ? 'p1' : ''} ${b.gap === 's' ? 'gs' : ''}" style="background:${(THEMES[b.theme] || THEMES.default).bg}">${ed(b, 'title', b.title, 's5')}${ed(b, 'text', b.text, 's3')}${b.linkLabel ? `<div class="lnkbtn" style="text-align:${getStyle(b, 'text').align}"><span>${esc(b.linkLabel)}</span></div>` : ''}</div>`;
     if (b.type === 'faq') inner = b.items.map((it, i) => `<div class="faq">${ed(b, `items.${i}.q`, it.q, 's4')}${ed(b, `items.${i}.a`, it.a, 's3')}</div>`).join('');
     if (b.type === 'numlist') inner = `<ol class="numl">${b.items.map((it, i) => `<li>${ed(b, `items.${i}.q`, it.q, 's4')}${ed(b, `items.${i}.a`, it.a, 's3')}</li>`).join('')}</ol>`;
-    if (b.type === 'table') { const st = getStyle(b, 'text'); const cs = `font-size:${SIZES[st.size]}px;color:${COLORS[st.color].hex};text-align:${st.align}`;
+    if ((b.type === 'table' || b.type === 'taste') && b.look === 'image') inner = picHtml(b);
+    else if (b.type === 'taste' && b.look === 'card') {
+      const multi = b.teas.length > 1;
+      const lines = [];
+      if (multi) lines.push(b.teas.map((t, i) => `${(MARKS[b.mark] || MARKS.dots)[0]} ${t.name || `Чай ${i + 1}`}`).join('   '));
+      b.rows.forEach((row) => lines.push(`${row.icon ? `${row.icon} ` : ''}${row.name}   ${b.teas.map((_, i) => scale(row.vals[i], b.max, b.mark)).join('  |  ')}`));
+      const tt = getStyle(b, 'title'); const tx = getStyle(b, 'text');
+      const head = ed(b, 'title', b.title, 's5').replace(/font-size:\d+px/, `font-size:${SIZES[tt.size === 'size4' ? 'size5' : tt.size]}px`).replace(/text-align:\w+/, 'text-align:center');
+      inner = `<div class="tb" style="background:${(THEMES[b.theme] || THEMES.tertiary).bg}">${head}<div class="txt" style="font-size:${SIZES[tx.size === 'size3' ? 'size4' : tx.size]}px;line-height:1.45;text-align:center;color:${COLORS[tx.color].hex}">${lines.map(esc).join('<br>')}</div></div>`;
+    } else if (b.type === 'table') { const st = getStyle(b, 'text'); const cs = `font-size:${SIZES[st.size]}px;color:${COLORS[st.color].hex};text-align:${st.align}`;
       const thead = b.hideHead ? '' : `<thead><tr>${b.head.map((h, i) => `<th style="${cs}">${smallImg((b.headImg || [])[i], h)}<div>${esc(h)}</div></th>`).join('')}</tr></thead>`;
       inner = `<div class="tbl">${ed(b, 'title', b.title, 's4')}<div class="tblw"><table>${thead}<tbody>${b.rows.map((r) => `<tr>${b.head.map((_, i) => `<td style="${cs}">${richHtml(r[i] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`; }
-    if (b.type === 'taste') { const st = getStyle(b, 'text'); const cs = `font-size:${SIZES[st.size]}px;color:${COLORS[st.color].hex}`;
+    else if (b.type === 'taste') { const st = getStyle(b, 'text'); const cs = `font-size:${SIZES[st.size]}px;color:${COLORS[st.color].hex}`;
       const showHead = b.teas.length > 1 || b.teas.some((t) => t.name || (t.img && (t.img.src || t.img.srcM)));
       const thead = showHead ? `<thead><tr><th></th>${b.teas.map((t) => `<th style="${cs};text-align:center">${smallImg(t.img, t.name)}<div>${esc(t.name)}</div></th>`).join('')}</tr></thead>` : '';
-      inner = `<div class="tbl">${ed(b, 'title', b.title, 's4')}<div class="tblw"><table>${thead}<tbody>${b.rows.map((r) => `<tr><td style="${cs}">${esc(r.name)}</td>${b.teas.map((_, i) => `<td class="scale" style="${cs};text-align:center">${scale(r.vals[i], b.max, b.mark)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`; }
+      inner = `<div class="tbl">${ed(b, 'title', b.title, 's4')}<div class="tblw"><table>${thead}<tbody>${b.rows.map((r) => `<tr><td style="${cs}">${esc(`${r.icon ? `${r.icon} ` : ''}${r.name}`)}</td>${b.teas.map((_, i) => `<td class="scale" style="${cs};text-align:center">${scale(r.vals[i], b.max, b.mark)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`; }
     if (b.type === 'cards') inner = `<div class="cards">${b.items.map((it, i) => `<div class="card">${(() => { const r = resolveImage('cards', it.img); const src = view === 'm' ? r.srcM : r.src; return src ? `<img src="${esc(src)}" alt="" referrerpolicy="no-referrer">` : '<div class="noico">значок</div>'; })()}${ed(b, `items.${i}.title`, it.title, 's4 c')}${ed(b, `items.${i}.text`, it.text, 's3 c')}</div>`).join('')}</div>`;
     if (b.type === 'video') inner = `<div class="vid"><span>▶</span><small>${esc(b.src || 'Видеофайл .mp4 — вставьте ссылку')}</small></div>`;
     if (b.type === 'catalog') inner = b.items.map((it, i) => `<div class="cat"><div>${imgHtml('catalog', it.img, it.title)}</div><div>${ed(b, `items.${i}.title`, it.title, `s4 ${productUrl(it.sku) ? 'lnk' : ''}`)}${ed(b, `items.${i}.text`, it.text, 's3')}</div></div>`).join('');
@@ -191,19 +212,36 @@ const ITEM_NAMES = { chess: 'Блок', tiles: 'Плитка', roll: 'Карти
 // Маленькое поле картинки (шапка таблицы, значок): одна ссылка на оба вида.
 const imgMini = (path, label, img) => fld(path, label, (img || {}).src || '', { ph: 'https://…/картинка.png — необязательно' });
 
+// Вид блока: текстом (Ozon красит только эмодзи) или цветной картинкой, которую рисует редактор.
+function lookEditor(b) {
+  const looks = Object.entries(LOOKS).filter(([k]) => b.type === 'taste' || k !== 'card');
+  let html = `<div class="grp look-grp"><b>Вид</b><div class="seg look" role="group" aria-label="Вид блока">${looks.map(([k, t]) => `<button type="button" data-act="look" data-v="${k}" aria-pressed="${(b.look || 'table') === k}">${t}</button>`).join('')}</div>`;
+  if (b.look === 'card') html += `<label for="f-theme">Фон плашки</label><select id="f-theme" data-f="theme">${Object.entries(THEMES).filter(([k]) => k !== 'default').map(([v, t]) => `<option value="${v}" ${(b.theme || 'tertiary') === v ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
+    <p class="note">Ozon даёт для фона только голубой, серый и белый. Цвет добавляют эмодзи-шкалы и значки свойств, текст на плашке крупнее.</p>`;
+  if (b.look === 'image') {
+    const pal = b.palette || 'shu';
+    html += `<label>Цвета картинки</label><div class="pals">${Object.entries(PALETTES).map(([k, p]) => `<button type="button" class="pal ${pal === k ? 'on' : ''}" data-act="palette" data-v="${k}" title="${esc(p.name)}"><span style="background:${p.bg}"></span><span style="background:${p.accents[0]}"></span><span style="background:${p.accents[1]}"></span><span style="background:${p.head}"></span><small>${esc(p.name)}</small></button>`).join('')}</div>
+      <ol class="steps"><li>Скачайте картинки: <button type="button" class="sm blue" data-act="picdl" data-m="0">Для ПК, 1416 px</button> <button type="button" class="sm ghost" data-act="picdl" data-m="1">Для телефона, 640 px</button></li>
+      <li>Загрузите их в конструктор rich-контента Ozon и скопируйте ссылки.</li><li>Вставьте ссылки сюда:</li></ol>
+      ${imgFields('pic', 'pic', b.pic || emptyImage())}
+      <p class="note">Картинка — во всю ширину, в любых цветах и с вашим шрифтом. Минус: текст на картинке Ozon не читает при поиске, поэтому важные слова держите и в обычном тексте карточки. После правок в таблице скачайте и загрузите картинку заново.</p>`;
+  }
+  return `${html}</div>`;
+}
+
 function tasteEditor(b) {
   const teas = b.teas.map((t, i) => `<div class="grp"><div class="gh"><b>Чай ${i + 1}</b><button type="button" class="icon ghost danger" data-act="tteadel" data-i="${i}" aria-label="Убрать чай" ${b.teas.length < 2 ? 'disabled' : ''}>×</button></div>
     ${fld(`teas.${i}.name`, b.teas.length > 1 ? 'Название в шапке' : 'Название в шапке — можно оставить пустым', t.name, { ph: 'Шу пуэр' })}
     ${imgMini(`teas.${i}.img.src`, 'Картинка над названием (Ozon показывает 96×96)', t.img)}</div>`).join('');
-  const marks = Object.entries(MARKS).map(([k, [on, off]]) => `<option value="${k}" ${b.mark === k ? 'selected' : ''}>${on}${on}${on}${off}${off}</option>`).join('');
-  const rows = b.rows.map((r, ri) => `<div class="trow" style="--cols:${b.teas.length + 1}"><input data-f="rows.${ri}.name" value="${esc(r.name)}" aria-label="Свойство ${ri + 1}">${b.teas.map((_, ci) => `<select data-f="rows.${ri}.vals.${ci}" data-num="1" aria-label="${esc(r.name)}: оценка">${Array.from({ length: b.max + 1 }, (_, v) => `<option value="${v}" ${Number(r.vals[ci] || 0) === v ? 'selected' : ''}>${v} ${scale(v, b.max, b.mark)}</option>`).join('')}</select>`).join('')}<button type="button" class="icon ghost danger" data-act="trowdel" data-i="${ri}" aria-label="Удалить строку">×</button></div>`).join('');
-  return `${fld('title', 'Заголовок', b.title)}
-    <div class="row2"><div><label for="f-mark">Значки</label><select id="f-mark" data-f="mark">${marks}</select></div>
+  const marks = Object.entries(MARKS).map(([k, [on, off]]) => `<option value="${k}" ${b.mark === k ? 'selected' : ''}>${on}${on}${on}${off}${off}${['brown', 'green', 'orange', 'red', 'purple'].includes(k) ? ' цветные' : ''}</option>`).join('');
+  const rows = b.rows.map((r, ri) => `<div class="trow ticon" style="--t:${b.teas.length}"><input class="ico" data-f="rows.${ri}.icon" value="${esc(r.icon || '')}" aria-label="Значок свойства ${ri + 1}" title="Значок — эмодзи, можно стереть"><input data-f="rows.${ri}.name" value="${esc(r.name)}" aria-label="Свойство ${ri + 1}">${b.teas.map((_, ci) => `<select data-f="rows.${ri}.vals.${ci}" data-num="1" aria-label="${esc(r.name)}: оценка">${Array.from({ length: b.max + 1 }, (_, v) => `<option value="${v}" ${Number(r.vals[ci] || 0) === v ? 'selected' : ''}>${v} ${scale(v, b.max, b.mark)}</option>`).join('')}</select>`).join('')}<button type="button" class="icon ghost danger" data-act="trowdel" data-i="${ri}" aria-label="Удалить строку">×</button></div>`).join('');
+  return `${lookEditor(b)}${fld('title', 'Заголовок', b.title)}
+    <div class="row2" ${b.look === 'image' ? 'hidden' : ''}><div><label for="f-mark">Значки</label><select id="f-mark" data-f="mark">${marks}</select></div>
     <div><label for="f-max">Шкала</label><select id="f-max" data-f="max" data-num="1">${[3, 5, 10].map((v) => `<option value="${v}" ${b.max === v ? 'selected' : ''}>из ${v}</option>`).join('')}</select></div></div>
     <label>Свойства и оценки</label>${rows}
     <div class="blk-acts"><button type="button" class="sm ghost" data-act="tasterow">Добавить свойство</button><button type="button" class="sm ghost" data-act="tasteadd">Добавить чай для сравнения</button></div>
     ${teas}
-    <p class="note">Уходит в Ozon таблицей. Один чай без названия — таблица без шапки; несколько чаёв — сравнение столбцами, с картинками в шапке.</p>`;
+    <p class="note">${b.look === 'image' ? 'На картинке оценки рисуются цветными полосками.' : 'Один чай без названия — таблица без шапки; несколько чаёв — сравнение столбцами, с картинками в шапке.'}</p>`;
 }
 
 // Оформление текста: только то, что разрешает Ozon — размер, цвет, выравнивание.
@@ -227,7 +265,7 @@ function tableEditor(b) {
   const rows = b.rows.map((r, ri) => `<div class="trow">${b.head.map((_, ci) => `<input data-f="rows.${ri}.${ci}" value="${esc(r[ci] ?? '')}" aria-label="Строка ${ri + 1}, столбец ${ci + 1}">`).join('')}<button type="button" class="icon ghost danger" data-act="trowdel" data-i="${ri}" aria-label="Удалить строку">×</button></div>`).join('');
   const phone = b.head.length <= 2 ? 'на телефоне таблица помещается целиком' : (b.head.length === 3 ? 'на телефоне помещается на большинстве экранов, на узких — чуть листается вбок' : 'на телефоне таблица листается пальцем вбок');
   const imgs = b.hideHead ? '' : `<details class="grp" ${(b.headImg || []).some((im) => im && im.src) ? 'open' : ''}><summary><b>Картинки в шапке</b> — над названием столбца, 96×96</summary>${b.head.map((h, i) => imgMini(`headImg.${i}.src`, `Столбец «${h}»`, (b.headImg || [])[i])).join('')}<p class="note">В строках таблицы картинок Ozon не допускает — только в шапке. Удобно для сравнения: фото чая над его столбцом.</p></details>`;
-  return `${fld('title', 'Заголовок таблицы', b.title)}<p class="note">Столбцов: ${b.head.length} — ${phone}. Ozon делает каждый столбец не уже 120 px.</p>
+  return `${lookEditor(b)}${fld('title', 'Заголовок таблицы', b.title)}<p class="note">Столбцов: ${b.head.length} — ${phone}. Ozon делает каждый столбец не уже 120 px.</p>
     <label class="chk"><input type="checkbox" data-f="hideHead" ${b.hideHead ? 'checked' : ''}> Без шапки — таблица «характеристика — значение»</label>
     <label>${b.hideHead ? 'Столбцы (названия не видны покупателю)' : 'Столбцы'}</label><div class="thead">${head}</div>${imgs}
     <label>Строки</label><div class="tbody" style="--cols:${b.head.length}">${rows}</div>
@@ -346,6 +384,10 @@ function onField(e) {
     if (e.type === 'change') renderInspector();
     return;
   }
+  // Новое название свойства — подбираем значок, если он был подобран автоматически.
+  const nm = f.match(/^rows\.(\d+)\.name$/);
+  if (nm && b.type === 'taste') { const row = b.rows[Number(nm[1])]; if (!row.icon || row.icon === iconFor(row.name)) row.icon = iconFor(val); }
+  if (f.startsWith('pic.') && !b.pic) b.pic = emptyImage();
   setPath(b, f, val);
   if (f === 'max') b.rows.forEach((r) => { r.vals = r.vals.map((v) => Math.min(v, val)); });
   if (/\.(src|srcM)$/.test(f)) {
@@ -399,7 +441,10 @@ function onAction(e) {
     case 'trowdel': b.rows.splice(i, 1); break;
     case 'tcoladd': b.head.push('Столбец'); b.rows.forEach((r) => r.push('')); break;
     case 'tcoldel': b.head.splice(i, 1); (b.headImg || []).splice(i, 1); b.rows.forEach((r) => r.splice(i, 1)); break;
-    case 'tasterow': b.rows.push({ name: 'Свойство', vals: b.teas.map(() => 0) }); break;
+    case 'tasterow': b.rows.push({ name: 'Свойство', icon: '🍵', vals: b.teas.map(() => 0) }); break;
+    case 'look': b.look = btn.dataset.v; if (!b.pic) b.pic = emptyImage(); if (!b.palette) b.palette = 'shu'; break;
+    case 'palette': b.palette = btn.dataset.v; break;
+    case 'picdl': fontsReady().then(() => downloadPicture(b, btn.dataset.m === '1')).then((f) => toast(`Скачано: ${f.name} (${f.w}×${f.h})`)); return;
     case 'tasteadd': b.teas.push({ name: `Чай ${b.teas.length + 1}`, img: emptyImage() }); b.rows.forEach((r) => r.vals.push(0)); break;
     case 'tteadel': b.teas.splice(i, 1); b.rows.forEach((r) => r.vals.splice(i, 1)); break;
     case 'lnkshop': {

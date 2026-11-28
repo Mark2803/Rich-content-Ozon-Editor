@@ -61,10 +61,23 @@ export const DEFAULT_SIZE = {
   catalog: { pc: [1000, 1000], m: [1000, 1000] },
   cards: { pc: [200, 200], m: [200, 200] },
   thead: { pc: [300, 300], m: [300, 300] },
+  pic: { pc: [1416, 800], m: [640, 900] },
 };
 
 // Шкалы для профиля вкуса: полный и пустой значок.
-export const MARKS = { dots: ['●', '○'], stars: ['★', '☆'], squares: ['■', '□'] };
+// Цветные шкалы — эмодзи-кружки: Ozon красит только их, обычный текст бывает лишь 4 цветов.
+export const MARKS = { brown: ['🟤', '⚪'], green: ['🟢', '⚪'], orange: ['🟠', '⚪'], red: ['🔴', '⚪'], purple: ['🟣', '⚪'], dots: ['●', '○'], stars: ['★', '☆'], squares: ['■', '□'] };
+// Значок свойства подбирается по названию; его можно поменять.
+const ICONS = [[/креп|насыщ/i, '💪'], [/терп|вяж/i, '🍂'], [/слад|мёд|мед/i, '🍯'], [/бодр|энерг|тониз/i, '⚡'], [/спок|рассл|сон|вечер/i, '🌙'],
+  [/аромат|цвет/i, '🌸'], [/фрукт|ягод/i, '🍑'], [/горч/i, '🌰'], [/кисл|цитрус/i, '🍋'], [/древ|земл/i, '🌳'], [/дым|копч/i, '🔥'], [/мягк|нежн/i, '☁️'], [/свеж|трав/i, '🌿'], [/шокол|какао/i, '🍫']];
+export const iconFor = (name) => (ICONS.find(([re]) => re.test(name || '')) || [null, '🍵'])[1];
+export const LOOKS = { table: 'Таблицей', card: 'Плашкой на цветном фоне', image: 'Цветной картинкой' };
+
+// Подпись к картинке (alt): содержимое словами — для покупателей с экранным диктором.
+export function pictureAlt(b) {
+  if (b.type === 'taste') return `${b.title || 'Профиль вкуса'}: ${b.rows.map((r) => `${r.name} ${b.teas.map((t, i) => `${b.teas.length > 1 ? `${t.name} ` : ''}${r.vals[i] || 0} из ${b.max}`).join(', ')}`).join('; ')}`.slice(0, 500);
+  return `${b.title || 'Таблица'}: ${b.rows.map((r) => r.join(' — ')).join('; ')}`.replace(/\[([^\]\n]+)\]\([^)\s]+\)/g, '$1').slice(0, 500);
+}
 export const scale = (v, max = 5, mark = 'dots') => {
   const [on, off] = MARKS[mark] || MARKS.dots;
   const n = Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
@@ -88,10 +101,10 @@ export function newBlock(type) {
     case 'text': return { id: uid(), type, title: 'Заголовок раздела', text: '', theme: 'primary', linkLabel: '', linkUrl: '' };
     case 'faq': return { id: uid(), type, items: [{ q: 'Вопрос', a: 'Ответ.' }] };
     case 'numlist': return { id: uid(), type, items: [{ q: 'Шаг', a: 'Описание шага.' }, { q: 'Шаг', a: 'Описание шага.' }] };
-    case 'table': return { id: uid(), type, title: 'Сколько чашек в упаковке', head: ['Фасовка', 'Кусочков', 'Чашек'], headImg: [], hideHead: false, rows: [['8 г', '15', '15'], ['25 г', '50', '50']] };
-    case 'taste': return { id: uid(), type, title: 'Профиль вкуса', mark: 'dots', max: 5,
+    case 'table': return { id: uid(), type, title: 'Сколько чашек в упаковке', head: ['Фасовка', 'Кусочков', 'Чашек'], headImg: [], hideHead: false, rows: [['8 г', '15', '15'], ['25 г', '50', '50']], look: 'table', palette: 'shu', pic: img() };
+    case 'taste': return { id: uid(), type, title: 'Профиль вкуса', mark: 'brown', max: 5, look: 'table', theme: 'tertiary', palette: 'shu', pic: img(),
       teas: [{ name: '', img: img() }],
-      rows: [['Крепость', 4], ['Терпкость', 2], ['Сладость', 3], ['Бодрость', 4]].map(([name, v]) => ({ name, vals: [v] })) };
+      rows: [['Крепость', 4], ['Терпкость', 2], ['Сладость', 3], ['Бодрость', 4]].map(([name, v]) => ({ name, icon: iconFor(name), vals: [v] })) };
     case 'cards': return { id: uid(), type, items: [['Бодрит', 'как чашка крепкого чая'], ['2 минуты', 'без чайника и сита'], ['Без сахара', '100% чай'], ['3 года', 'срок хранения']].map(([title, text]) => ({ title, text, sku: '', img: img() })) };
     case 'video': return { id: uid(), type, src: '', w: 1280, h: 720 };
     case 'catalog': return { id: uid(), type, items: [{ title: 'Название чая', sku: '', text: 'Одна строка о вкусе.', img: img() }] };
@@ -257,6 +270,18 @@ export function toOzon(blocks) {
         title: textObj(it.title, getStyle(b, 'title'), productUrl(it.sku)),
         text: textObj(it.text, getStyle(b, 'text')),
       })) });
+    } else if ((b.type === 'table' || b.type === 'taste') && b.look === 'image') {
+      // Цветная картинка, которую нарисовал редактор и загрузили в Ozon.
+      content.push({ widgetName: 'raShowcase', type: 'roll', blocks: [{ img: imgShowcase('pic', b.pic || {}, pictureAlt(b), 'width_full'), imgLink: '' }] });
+    } else if (b.type === 'taste' && b.look === 'card') {
+      // Плашка: цветной фон Ozon, крупный текст, строки «💪 Крепость 🟤🟤🟤🟤⚪».
+      const multi = b.teas.length > 1;
+      const lines = [];
+      if (multi) lines.push(b.teas.map((t, i) => `${MARKS[b.mark] ? MARKS[b.mark][0] : ''} ${t.name || `Чай ${i + 1}`}`).join('   '));
+      b.rows.forEach((row) => lines.push(`${row.icon ? `${row.icon} ` : ''}${row.name}   ${b.teas.map((_, i) => scale(row.vals[i], b.max, b.mark)).join('  |  ')}`));
+      content.push({ widgetName: 'raTextBlock', theme: b.theme || 'tertiary', padding: 'type2', gapSize: 'm',
+        title: textObj(b.title, { ...getStyle(b, 'title'), size: getStyle(b, 'title').size === 'size4' ? 'size5' : getStyle(b, 'title').size, align: 'center' }),
+        text: textObj(lines.join('\n'), { ...getStyle(b, 'text'), size: getStyle(b, 'text').size === 'size3' ? 'size4' : getStyle(b, 'text').size, align: 'center' }) });
     } else if (b.type === 'table') {
       const st = getStyle(b, 'text');
       const table = {
@@ -279,7 +304,7 @@ export function toOzon(blocks) {
         if (showHead && t.img && (t.img.src || t.img.srcM)) cell.img = imgHead(t.img, t.name);
         return cell;
       })];
-      const table = { head, body: b.rows.map((r) => [[r.name], ...b.teas.map((_, i) => [scale(r.vals[i], b.max, b.mark)])]) };
+      const table = { head, body: b.rows.map((r) => [[`${r.icon ? `${r.icon} ` : ''}${r.name}`], ...b.teas.map((_, i) => [scale(r.vals[i], b.max, b.mark)])]) };
       if (!showHead) table.hideHead = true;
       content.push({ widgetName: 'raTable', title: textObj(b.title, getStyle(b, 'title')), table });
     } else if (b.type === 'cards') {
@@ -381,16 +406,20 @@ export function fromOzon(json) {
       const rows = (w.table.body || []).map((r) => r.map(cell));
       const st = { title: clean(fmtOf(w.title)), text: clean(fmtOf(headCells[1] || headCells[0])) };
       // Таблица, где во всех ячейках кроме первого столбца шкалы ●●●○○, — это профиль вкуса.
-      const markOf = (s) => Object.entries(MARKS).find(([, [on, off]]) => new RegExp(`^[${on}${off}]+$`).test(s));
+      const markOf = (s) => Object.entries(MARKS).find(([, [on, off]]) => new RegExp(`^[${on}${off}]+$`, 'u').test(s));
       const taste = rows.length && head.length > 1 && rows.every((r) => r.length === head.length && r.slice(1).every((c) => markOf(c)));
       if (taste) {
         const mark = markOf(rows[0][1])[0];
         const [on] = MARKS[mark];
         out.push({ id: uid(), type: 'taste', title: readText(w.title), mark, max: rows[0][1].length,
           teas: head.slice(1).map((name, i) => ({ name, img: headImg[i + 1] })),
-          rows: rows.map((r) => ({ name: r[0], vals: r.slice(1).map((c) => [...c].filter((ch) => ch === on).length) })), style: st });
+          look: 'table', theme: 'tertiary', palette: 'shu', pic: emptyImage(),
+          rows: rows.map((r) => {
+            const m = String(r[0]).match(/^(\p{Extended_Pictographic}\uFE0F?)\s+(.*)$/u);
+            return { name: m ? m[2] : r[0], icon: m ? m[1] : '', vals: r.slice(1).map((c) => [...c].filter((ch) => ch === on).length) };
+          }), style: st });
       } else {
-        out.push({ id: uid(), type: 'table', title: readText(w.title), head, headImg, hideHead: Boolean(w.table.hideHead), rows, style: st });
+        out.push({ id: uid(), type: 'table', title: readText(w.title), head, headImg, hideHead: Boolean(w.table.hideHead), rows, style: st, look: 'table', palette: 'shu', pic: emptyImage() });
       }
     } else if (w.widgetName === 'raVideo') {
       // Ролики YouTube не переносим: в России они у покупателей не грузятся (решение Марка 27.11.2026).
@@ -423,6 +452,11 @@ export function check(blocks) {
     if (b.type === 'text' && (b.linkLabel || b.linkUrl) && !(b.linkLabel && isOzonUrl(b.linkUrl))) problems.push(`${where}: у кнопки-ссылки нужны и подпись, и адрес на ozon.ru`);
     if (b.type === 'table' && (!b.head.length || !b.rows.length)) problems.push(`${where}: в таблице нужны столбцы и хотя бы одна строка`);
     if (b.type === 'table' && !b.hideHead) (b.headImg || []).forEach((im) => { if (im && (im.src || im.srcM)) { const r = resolveImage('thead', im); imgs.push([where, r.src], [where, r.srcM]); } });
+    if ((b.type === 'taste' || b.type === 'table') && b.look === 'image') {
+      const r = resolveImage('pic', b.pic || {});
+      if (!r.src) problems.push(`${where}: скачайте цветную картинку, загрузите её в конструктор rich-контента Ozon и вставьте ссылку`);
+      else imgs.push([where, r.src], [where, r.srcM]);
+    }
     if (b.type === 'taste') {
       if (!b.teas.length || !b.rows.length) problems.push(`${where}: нужен хотя бы один чай и одна строка`);
       b.teas.forEach((t) => { if (t.img && (t.img.src || t.img.srcM)) { const r = resolveImage('thead', t.img); imgs.push([where, r.src], [where, r.srcM]); } });

@@ -157,7 +157,7 @@ test('профиль вкуса: таблица со шкалами, без ша
   const w = toOzon([b]).content[0];
   assert.equal(w.widgetName, 'raTable');
   assert.equal(w.table.hideHead, true);
-  assert.deepEqual(w.table.body[0], [['Крепость'], ['●●●●○']]);
+  assert.deepEqual(w.table.body[0], [['💪 Крепость'], ['🟤🟤🟤🟤⚪']], 'цветная шкала и значок свойства');
   // сравнение двух чаёв — с шапкой и картинками
   b.teas = [{ name: 'Шу пуэр', img: { src: 'https://x.ru/shu.png', srcM: '', w: 300, h: 300, wM: 0, hM: 0 } }, { name: 'ГАБА', img: { src: '', srcM: '', w: 0, h: 0, wM: 0, hM: 0 } }];
   b.rows.forEach((r) => r.vals.push(1));
@@ -168,7 +168,8 @@ test('профиль вкуса: таблица со шкалами, без ша
   const back = fromOzon(toOzon([b])).blocks[0];
   assert.equal(back.type, 'taste');
   assert.deepEqual(back.teas.map((t) => t.name), ['Шу пуэр', 'ГАБА']);
-  assert.deepEqual(back.rows[0], { name: 'Крепость', vals: [4, 1] });
+  assert.deepEqual(back.rows[0], { name: 'Крепость', icon: '💪', vals: [4, 1] });
+  assert.equal(back.mark, 'brown');
   assert.equal(back.teas[0].img.src, 'https://x.ru/shu.png');
 });
 
@@ -215,4 +216,27 @@ test('карточки со значком и плитки по 4', () => {
   assert.equal(toOzon([t]).content[0].type, 'tileM');
   const back = fromOzon(toOzon([t])).blocks[0];
   assert.equal(back.layout, '4'); assert.equal(back.items.length, 4);
+});
+
+test('профиль вкуса и таблица: вид плашкой и цветной картинкой', async () => {
+  const { iconFor } = await import('../public/rich.js');
+  assert.equal(iconFor('Сладость'), '🍯');
+  assert.equal(iconFor('Что-то'), '🍵');
+  const b = newBlock('taste');
+  b.look = 'card';
+  const w = toOzon([b]).content[0];
+  assert.equal(w.widgetName, 'raTextBlock');
+  assert.equal(w.theme, 'tertiary');
+  assert.equal(w.text.size, 'size4', 'на плашке текст крупнее');
+  assert.equal(w.text.items[0].content, '💪 Крепость   🟤🟤🟤🟤⚪');
+  b.look = 'image';
+  assert.ok(check([b]).some((p) => p.includes('загрузите её')), 'без ссылки на картинку — подсказка');
+  b.pic = { src: 'https://cdn1.ozone.ru/s3/rich/taste.png', srcM: 'https://cdn1.ozone.ru/s3/rich/taste-m.png', w: 1416, h: 760, wM: 640, hM: 900 };
+  const p = toOzon([b]).content[0];
+  assert.equal(p.type, 'roll');
+  assert.equal(p.blocks[0].img.srcMobile, 'https://cdn1.ozone.ru/s3/rich/taste-m.png');
+  assert.match(p.blocks[0].img.alt, /Крепость 4 из 5/);
+  assert.deepEqual(check([b]).filter((x) => x.includes('загрузите')), []);
+  const t = newBlock('table'); t.look = 'image'; t.pic = b.pic;
+  assert.equal(toOzon([t]).content[0].type, 'roll');
 });
